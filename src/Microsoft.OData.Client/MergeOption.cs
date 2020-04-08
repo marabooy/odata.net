@@ -52,5 +52,9 @@ namespace Microsoft.OData.Client
         /// Equivalent to System.Data.Objects.MergeOption.NoTracking
         /// </summary>
         NoTracking = 3,
+        /// <summary>
+        /// Equivalent to NoTracking Except for MediaLink Entries.
+        /// </summary>
+        TrackMediaLinkEntriesOnly = 4,
     }
 }

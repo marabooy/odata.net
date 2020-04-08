@@ -208,6 +208,7 @@ namespace Microsoft.OData.Client
                 case MergeOption.OverwriteChanges:
                 case MergeOption.PreserveChanges:
                 case MergeOption.NoTracking:
+                case MergeOption.TrackMediaLinkEntriesOnly:
                     return value;
                 default:
                     throw Error.ArgumentOutOfRange(parameterName);

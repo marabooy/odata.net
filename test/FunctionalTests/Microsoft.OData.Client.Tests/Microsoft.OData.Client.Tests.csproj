@@ -71,6 +71,7 @@
     <Compile Include="ALinq\SelectExpandPathToStringVisitorTests.cs" />
     <Compile Include="ALinq\RemoveWildcardVisitorTests.cs" />
     <Compile Include="ALinq\SelectExpandPathBuilderTests.cs" />
+    <Compile Include="Tracking\DataServiceContextTrackOnlyMleNonAsyncApiTests.cs" />
     <Compile Include="Metadata\ClientTypeUtilTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -100,6 +101,7 @@
       <Name>Microsoft.Spatial</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

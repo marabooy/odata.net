@@ -176,6 +176,11 @@ namespace Microsoft.OData.Client.Materialization
             // We should either create a new instance or grab one from the context.
             if (this.MergeOption != MergeOption.NoTracking)
             {
+                if (this.MergeOption == MergeOption.TrackMediaLinkEntriesOnly && !entry.EntityDescriptor.IsMediaLinkEntry)
+                {
+                    return false;
+                }
+
                 EntityStates state;
                 entry.ResolvedObject = this.EntityTracker.TryGetEntity(entry.Id, out state);
                 if (entry.ResolvedObject != null)

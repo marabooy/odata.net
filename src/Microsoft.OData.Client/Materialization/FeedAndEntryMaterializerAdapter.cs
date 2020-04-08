@@ -9,8 +9,10 @@ namespace Microsoft.OData.Client.Materialization
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Linq;
     using Microsoft.OData;
     using Microsoft.OData.Client;
+    using Microsoft.OData.Edm;
     using DSClient = Microsoft.OData.Client;
 
     /// <summary>
@@ -335,10 +337,21 @@ namespace Microsoft.OData.Client.Materialization
             List<ODataNestedResourceInfo> navigationLinks = new List<ODataNestedResourceInfo>();
             if (result != null)
             {
+                bool entityShouldBeTracked = !( this.mergeOption == MergeOption.NoTracking || this.mergeOption == MergeOption.TrackMediaLinkEntriesOnly);
+                if (this.mergeOption == MergeOption.TrackMediaLinkEntriesOnly)
+                {
+                    IEdmEntityType modelEntry = clientEdmModel.FindDeclaredType(result.TypeName) as IEdmEntityType;
+
+                    if (modelEntry != null)
+                    {
+                        entityShouldBeTracked = modelEntry.HasStream;
+                    }
+                }
+
                 entry = MaterializerEntry.CreateEntry(
                     result,
                     this.readODataFormat,
-                    this.mergeOption != MergeOption.NoTracking,
+                    entityShouldBeTracked,
                     this.clientEdmModel);
 
                 do
