@@ -1,18 +1,19 @@
-﻿using Microsoft.OData.Edm.Csdl;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Xml;
-using Xunit;
-
-namespace Microsoft.OData.Client.Tests.Tracking
+﻿namespace Microsoft.OData.Client.Tests.Tracking
 {
-    public class DataServiceContextTrackOnlyMleNonAsyncApiTests
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.IO;
+    using System.Text;
+    using System.Threading.Tasks;
+    using System.Xml;
+    using Microsoft.OData.Edm.Csdl;
+    using Xunit;
+
+    public class DataServiceContextTrackOnlyMleTests
     {
-        private Container NoTrackingContext;
-        private Container TrackIngMLEOnlyContext;
+        private Container NoNTrackingContext;
+        private Container DefaultTrackingContext;
 
         #region TestEDMX 
 
@@ -103,113 +104,174 @@ namespace Microsoft.OData.Client.Tests.Tracking
       }";
 
         #endregion
+        private const string AttatchmentResponse = "Hello World!";
 
-        private int count = 0;
 
-        public DataServiceContextTrackOnlyMleNonAsyncApiTests()
+        public DataServiceContextTrackOnlyMleTests()
         {
             var uri = new Uri("http://localhost:8000");
 
-            NoTrackingContext = new Container(uri)
+            NoNTrackingContext = new Container(uri)
             {
                 MergeOption = MergeOption.NoTracking
             };
 
-            TrackIngMLEOnlyContext = new Container(uri)
-            {
-                MergeOption = MergeOption.TrackMediaLinkEntriesOnly
-            };
+            DefaultTrackingContext = new Container(uri);
         }
 
         [Fact]
-        public void BehaviourShouldMatchNoTrackingForFetchedItemsNonMediaLinkEntries()
+        public void TestAddingBehaviourShouldNotBeModified()
         {
-            SetupContextWithRequestPipeline(new DataServiceContext[] { TrackIngMLEOnlyContext, NoTrackingContext }, false);
+            SetupContextWithRequestPipeline(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext }, false);
 
-            var users = TrackIngMLEOnlyContext.Users.Execute();
-            var users2 = NoTrackingContext.Users.Execute();
-            // data should be fetched and the count should be the same
-            // Assert.Equal(users.ToList().Count, users2.ToList().Count);
+            var users = DefaultTrackingContext.Users;
+            var users2 = NoNTrackingContext.Users;
+            Assert.Equal(users.ToImmutableList().Count, users2.ToImmutableList().Count);
 
-            // no entities should be tracked by both
-            Assert.Equal(0, NoTrackingContext.EntityTracker.Entities.ToList().Count);
-            Assert.Equal(0, TrackIngMLEOnlyContext.EntityTracker.Entities.ToList().Count);
-            Assert.Equal(0, NoTrackingContext.Entities.ToList().Count);
-            Assert.Equal(0, TrackIngMLEOnlyContext.Entities.ToList().Count);
+
+            //  entities should be tracked by no tracking context
+            Assert.Equal(0, NoNTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
+            Assert.Equal(3, DefaultTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
+            Assert.Equal(0, NoNTrackingContext.Entities.Count);
+            Assert.Equal(3, DefaultTrackingContext.Entities.Count);
         }
         [Fact]
         public void TrackMediaEntitiesShouldBePopulatedWithMediaEntities()
         {
-            SetupContextWithRequestPipeline(new DataServiceContext[] { TrackIngMLEOnlyContext, NoTrackingContext }, true);
+            SetupContextWithRequestPipeline(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext }, true);
 
-            var mLeItems = TrackIngMLEOnlyContext.Documents.Execute().ToList();
-            var mleNoTracking = NoTrackingContext.Documents.Execute().ToList();
+            var mLeItems = DefaultTrackingContext.Documents;
+            var mleNoTracking = NoNTrackingContext.Documents;
             // data should be equals
-            Assert.Equal(mleNoTracking.Count, mLeItems.Count);
+            Assert.Equal(mleNoTracking.ToImmutableList().Count, mLeItems.ToImmutableList().Count);
 
-            Assert.Equal(0, NoTrackingContext.EntityTracker.Entities.ToList().Count);
-            Assert.Equal(mLeItems.Count, TrackIngMLEOnlyContext.Entities.ToList().Count);
-            var entityDescriptors = TrackIngMLEOnlyContext.EntityTracker.Entities.ToList();
-            Assert.Equal(mLeItems.Count, entityDescriptors.Count);
+            Assert.Equal(0, NoNTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
+            Assert.Equal(mLeItems.ToImmutableList().Count, DefaultTrackingContext.Entities.ToImmutableList().Count);
+            var entityDescriptors = DefaultTrackingContext.EntityTracker.Entities.ToImmutableList();
+            Assert.Equal(mLeItems.ToImmutableList().Count, entityDescriptors.Count);
 
             foreach (var entityDescriptor in entityDescriptors)
             {
                 Assert.Equal(EntityStates.Unchanged, entityDescriptor.State);
                 Assert.NotNull(entityDescriptor.ReadStreamUri);
-                Assert.NotNull(entityDescriptor.Identity);
             }
+
+            // verify that the stream links are equal 
+            foreach (var document in mleNoTracking)
+            {
+                var doc = document as BaseEntityType;
+                Assert.NotNull(doc.StreamDescriptor.SelfLink);
+                Assert.NotNull(NoNTrackingContext.GetReadStreamUri(document));
+
+                //try and get the content and verify that the content matches the values
+                Stream result = GetTestReadStreamResult(NoNTrackingContext, document);
+
+                Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
+
+            }
+
+
+
+
+
+        }
+
+        private Stream GetTestReadStreamResult(DataServiceContext dataServiceContext, Document document)
+        {
+            dataServiceContext.Configurations.RequestPipeline.OnMessageCreating = args =>
+            {
+                // if we read the wrong link then reply with gibberish
+                var resp = (args.RequestUri == document.StreamDescriptor.SelfLink) ? AttatchmentResponse : "gibberish";
+
+                return new CustomizedRequestMessage(
+                    args,
+                    resp,
+                    new Dictionary<string, string>
+                    {
+                            {"Content-Type", "text/plain"}
+
+                    });
+
+
+            };
+
+
+            var streamResponse = dataServiceContext.GetReadStream(document, new DataServiceRequestArgs());
+            return streamResponse.Stream;
 
         }
 
         [Theory]
         [InlineData(false, 1, 1)]
-        public async void TestShowAddingBehaviourIsNotModifiedForEntities(bool isMle, int expectedNoTracking,
+        public async void TestAddingNewItemsBehaviourShouldBeUnAltered(bool isMle, int expectedNoTracking,
             int expectedTrackingMle)
         {
             SetupContextWithRequestPipelineForSaving(
-                new DataServiceContext[] { NoTrackingContext, TrackIngMLEOnlyContext }, isMle);
+                new DataServiceContext[] { NoNTrackingContext, DefaultTrackingContext }, isMle);
+            var document = new Document
+            {
+                Id = 1,
+                FileLength = 0,
+                Name = "New Document"
+            };
 
             var user = new User
             {
                 Name = "Some name"
             };
-            TrackIngMLEOnlyContext.AddObject("Users", user);
-            NoTrackingContext.AddObject("Users", user);
-            Assert.NotNull(NoTrackingContext.GetEntityDescriptor(user));
-            Assert.NotNull(TrackIngMLEOnlyContext.GetEntityDescriptor(user));
+            if (isMle)
+            {
+
+                DefaultTrackingContext.AddObject("Documents", document);
+
+                DefaultTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
+
+                NoNTrackingContext.AddObject("Documents", document);
+                NoNTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
+
+            }
+            else
+            {
+                DefaultTrackingContext.AddObject("Users", user);
+                NoNTrackingContext.AddObject("Users", user);
+                Assert.NotNull(NoNTrackingContext.GetEntityDescriptor(user));
+                Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
+
+            }
 
 
 
-            SaveContextChanges(new DataServiceContext[] { TrackIngMLEOnlyContext, NoTrackingContext });
+            await SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext });
 
-            Assert.Equal(expectedTrackingMle, TrackIngMLEOnlyContext.Entities.ToList().Count);
-            Assert.Equal(expectedNoTracking, NoTrackingContext.Entities.ToList().Count);
+            Assert.Equal(expectedTrackingMle, DefaultTrackingContext.Entities.ToImmutableList().Count);
+            Assert.Equal(expectedNoTracking, NoNTrackingContext.Entities.ToImmutableList().Count);
 
         }
 
-        private void SaveContextChanges(DataServiceContext[] dataServiceContexts)
+        private async Task SaveContextChanges(DataServiceContext[] dataServiceContexts)
         {
             foreach (var dataServiceContext in dataServiceContexts)
             {
-                dataServiceContext.SaveChanges();
+                await dataServiceContext.SaveChangesAsync();
             }
         }
 
         private void SetupContextWithRequestPipelineForSaving(DataServiceContext[] dataServiceContexts, bool forMle)
         {
             var response = forMle ? DOCUMENT_RESPONSE : USER_RESPONSE;
-            var location = forMle ? "http://localhost:8000/Documents(1)" : "http://localhost:8000/Users(1)";
+            var location = forMle ? "http://localhost:8000/Documents(1)/edit/content" : "http://localhost:8000/Users(1)";
 
             foreach (var context in dataServiceContexts)
             {
                 context.Configurations.RequestPipeline.OnMessageCreating =
-                    (args) => new CustomizedRequestMessage(
+                    args => new CustomizedRequestMessage(
                         args,
                         response,
-                        new Dictionary<string, string>()
+                        new Dictionary<string, string>
                         {
                             {"Content-Type", "application/json;charset=utf-8"},
-                            {"Location", location},
+                            { "Location", location }
+
                         });
             }
 
@@ -224,12 +286,12 @@ namespace Microsoft.OData.Client.Tests.Tracking
             foreach (var context in dataServiceContexts)
             {
                 context.Configurations.RequestPipeline.OnMessageCreating =
-                    (args) => new CustomizedRequestMessage(
+                    args => new CustomizedRequestMessage(
                         args,
                         response,
-                        new Dictionary<string, string>()
+                        new Dictionary<string, string>
                         {
-                                {"Content-Type", "application/json;charset=utf-8"},
+                                {"Content-Type", "application/json;charset=utf-8"}
                         });
             }
 
@@ -239,13 +301,13 @@ namespace Microsoft.OData.Client.Tests.Tracking
         class Container : DataServiceContext
         {
 
-            public Container(global::System.Uri serviceRoot) :
+            public Container(Uri serviceRoot) :
                 base(serviceRoot, ODataProtocolVersion.V4)
             {
-                this.Format.LoadServiceModel = () => CsdlReader.Parse(XmlReader.Create(new StringReader(Edmx)));
-                this.Format.UseJson();
-                this.Users = base.CreateQuery<User>("Users");
-                this.Documents = base.CreateQuery<Document>("Documents");
+                Format.LoadServiceModel = () => CsdlReader.Parse(XmlReader.Create(new StringReader(Edmx)));
+                Format.UseJson();
+                Users = CreateQuery<User>("Users");
+                Documents = CreateQuery<Document>("Documents");
             }
 
             public DataServiceQuery<User> Users { get; private set; }
@@ -253,7 +315,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
         }
     }
     [Key("Id")]
-    [HasStream()]
+    [HasStream]
     internal class Document : BaseEntityType
     {
         public int Id { get; set; }
@@ -281,25 +343,23 @@ namespace Microsoft.OData.Client.Tests.Tracking
         public CustomizedRequestMessage(DataServiceClientRequestMessageArgs args, string response, Dictionary<string, string> headers)
             : base(args)
         {
-            this.Response = response;
-            this.CustomizedHeaders = headers;
+            Response = response;
+            CustomizedHeaders = headers;
         }
 
         public override Stream GetStream()
         {
-            return new MemoryStream();
+            byte[] byteArray = Encoding.UTF8.GetBytes(Response);
+            return new MemoryStream(byteArray);
         }
 
         public override IODataResponseMessage GetResponse()
         {
             return new HttpWebResponseMessage(
-                this.CustomizedHeaders,
+                CustomizedHeaders,
                 200,
                 () =>
-                {
-                    byte[] byteArray = Encoding.UTF8.GetBytes(this.Response);
-                    return new MemoryStream(byteArray);
-                });
+                GetStream());
         }
 
     }

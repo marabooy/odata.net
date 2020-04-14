@@ -337,21 +337,11 @@ namespace Microsoft.OData.Client.Materialization
             List<ODataNestedResourceInfo> navigationLinks = new List<ODataNestedResourceInfo>();
             if (result != null)
             {
-                bool entityShouldBeTracked = !( this.mergeOption == MergeOption.NoTracking || this.mergeOption == MergeOption.TrackMediaLinkEntriesOnly);
-                if (this.mergeOption == MergeOption.TrackMediaLinkEntriesOnly)
-                {
-                    IEdmEntityType modelEntry = clientEdmModel.FindDeclaredType(result.TypeName) as IEdmEntityType;
-
-                    if (modelEntry != null)
-                    {
-                        entityShouldBeTracked = modelEntry.HasStream;
-                    }
-                }
-
+                
                 entry = MaterializerEntry.CreateEntry(
                     result,
                     this.readODataFormat,
-                    entityShouldBeTracked,
+                    this.mergeOption != MergeOption.NoTracking,
                     this.clientEdmModel);
 
                 do

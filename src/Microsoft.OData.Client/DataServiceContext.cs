@@ -1248,8 +1248,29 @@ namespace Microsoft.OData.Client
         public Uri GetReadStreamUri(object entity)
         {
             Util.CheckArgumentNull(entity, "entity");
-            EntityDescriptor box = this.entityTracker.GetEntityDescriptor(entity);
+            var box = GetEntityDescriptorForStreamEntity(entity);
             return box.ReadStreamUri;
+        }
+
+        private EntityDescriptor GetEntityDescriptorForStreamEntity(object entity)
+        {
+            EntityDescriptor box;
+            if (MergeOption == MergeOption.NoTracking)
+            {
+                BaseEntityType baseEntity = entity as BaseEntityType;
+                if (baseEntity == null)
+                {
+                    throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
+                }
+
+                box = baseEntity.StreamDescriptor.EntityDescriptor;
+            }
+            else
+            {
+                box = this.entityTracker.GetEntityDescriptor(entity);
+            }
+
+            return box;
         }
 
         /// <summary>Gets the URI that is used to return a named binary data stream.</summary>
@@ -1264,7 +1285,7 @@ namespace Microsoft.OData.Client
             Util.CheckArgumentNull(entity, "entity");
             Util.CheckArgumentNullAndEmpty(name, "name");
             this.EnsureMinimumProtocolVersionV3();
-            EntityDescriptor entityDescriptor = this.entityTracker.GetEntityDescriptor(entity);
+            EntityDescriptor entityDescriptor = GetEntityDescriptorForStreamEntity(entity);
             StreamDescriptor namedStreamInfo;
             if (entityDescriptor.TryGetNamedStreamInfo(name, out namedStreamInfo))
             {
@@ -3284,8 +3305,30 @@ namespace Microsoft.OData.Client
             Util.CheckArgumentNull(entity, "entity");
             Util.CheckArgumentNull(args, "args");
 
-            EntityDescriptor entityDescriptor = this.entityTracker.GetEntityDescriptor(entity);
+            EntityDescriptor entityDescriptor;
             StreamDescriptor streamDescriptor;
+
+            if (MergeOption != MergeOption.NoTracking)
+            {
+                entityDescriptor = this.entityTracker.GetEntityDescriptor(entity);
+            }
+            else
+            {
+                // this is the only way to opt into reading streams when not tracking
+                BaseEntityType baseEntity = entity as BaseEntityType;
+                if (baseEntity == null)
+                {
+                    throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
+                }
+
+                entityDescriptor = baseEntity?.StreamDescriptor?.EntityDescriptor;
+
+                if (entityDescriptor == null)
+                {
+                    throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
+
+                }
+            }           
             Uri requestUri;
             Version version;
             if (name == null)

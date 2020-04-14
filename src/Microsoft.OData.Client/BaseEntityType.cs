@@ -13,5 +13,9 @@ namespace Microsoft.OData.Client
     {
         /// <summary>DataServiceContext for query provider</summary>
         protected internal DataServiceContext Context { get; set; }
+        /// <summary>
+        /// Stream descriptor for the entity  containing entity stream links
+        /// </summary>
+        protected internal StreamDescriptor StreamDescriptor { get; set; }
     }
 }

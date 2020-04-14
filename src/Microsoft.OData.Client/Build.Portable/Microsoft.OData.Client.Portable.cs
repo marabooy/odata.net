@@ -92,6 +92,7 @@ namespace Microsoft.OData.Client {
         internal const string Context_OnMessageCreatingReturningNull = "Context_OnMessageCreatingReturningNull";
         internal const string Context_SendingRequest_InvalidWhenUsingOnMessageCreating = "Context_SendingRequest_InvalidWhenUsingOnMessageCreating";
         internal const string Context_MustBeUsedWith = "Context_MustBeUsedWith";
+        internal const string Context_EntityMediaLinksNotTrackedInEntity = "Context_EntityMediaLinksNotTrackedInEntity";
         internal const string DataServiceClientFormat_LoadServiceModelRequired = "DataServiceClientFormat_LoadServiceModelRequired";
         internal const string DataServiceClientFormat_ValidServiceModelRequiredForJson = "DataServiceClientFormat_ValidServiceModelRequiredForJson";
         internal const string Collection_NullCollectionReference = "Collection_NullCollectionReference";

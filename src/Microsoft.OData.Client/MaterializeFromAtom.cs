@@ -4,6 +4,8 @@
 // </copyright>
 //---------------------------------------------------------------------
 
+using Microsoft.OData.Edm;
+
 namespace Microsoft.OData.Client
 {
     #region Namespaces
@@ -345,9 +347,53 @@ namespace Microsoft.OData.Client
                     if (result)
                     {
                         BaseEntityType entity = this.materializer.CurrentValue as BaseEntityType;
+
                         if (entity != null)
                         {
                             entity.Context = this.responseInfo.Context;
+                            
+                            ODataResource resource = this.materializer.CurrentEntry;
+
+                            ClientEdmModel model = Context.Model;
+
+                            IEdmEntityType type = model.FindDeclaredType(resource.TypeName) as IEdmEntityType;
+
+                            // In NoTracking people can opt out of this behaviour of populating streams in entities by not extending BaseEntityType
+                            if (type != null && type.HasStream && Context.MergeOption == MergeOption.NoTracking)
+                            {
+                                var descriptor = new EntityDescriptor(model)
+                                {
+                                    Entity = this.materializer.CurrentValue,
+                                    EditLink = resource.EditLink,
+                                    Identity = resource.Id,
+                                    SelfLink = resource.ReadLink
+                                };
+
+                                if (resource.MediaResource != null)
+                                {
+                                    if (resource.MediaResource.EditLink != null)
+                                    {
+                                        descriptor.EditStreamUri = resource.MediaResource.EditLink;
+                                    }
+                                    if (resource.MediaResource.ReadLink != null)
+                                    {
+                                        descriptor.ReadStreamUri = resource.MediaResource.ReadLink;
+                                    }
+                                    if (resource.MediaResource.ETag != null)
+                                    {
+                                        descriptor.StreamETag = resource.MediaResource.ETag;
+                                    }
+
+                                    entity.StreamDescriptor = descriptor.DefaultStreamDescriptor;
+
+                                    if (resource.MediaResource.ContentType != null)
+                                    {
+                                        entity.StreamDescriptor.ContentType = resource.MediaResource.ContentType;
+                                    }
+                                }
+
+
+                            }
                         }
 
                         this.current = this.materializer.CurrentValue;
@@ -506,7 +552,7 @@ namespace Microsoft.OData.Client
 
                     default:
                         throw Error.InvalidOperation(Strings.Deserialize_ExpectingSimpleValue);
-                    #endregion
+                        #endregion
                 }
             }
 
