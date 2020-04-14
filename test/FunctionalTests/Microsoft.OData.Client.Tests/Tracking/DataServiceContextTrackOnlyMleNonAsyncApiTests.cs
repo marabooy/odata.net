@@ -1,18 +1,20 @@
-﻿namespace Microsoft.OData.Client.Tests.Tracking
+﻿
+using FluentAssertions;
+
+namespace Microsoft.OData.Client.Tests.Tracking
 {
     using System;
     using System.Collections.Generic;
-    using System.Collections.Immutable;
     using System.IO;
+    using System.Linq;
     using System.Text;
-    using System.Threading.Tasks;
     using System.Xml;
     using Microsoft.OData.Edm.Csdl;
     using Xunit;
 
     public class DataServiceContextTrackOnlyMleTests
     {
-        private Container NoNTrackingContext;
+        private Container NonTrackingContext;
         private Container DefaultTrackingContext;
 
         #region TestEDMX 
@@ -111,7 +113,7 @@
         {
             var uri = new Uri("http://localhost:8000");
 
-            NoNTrackingContext = new Container(uri)
+            NonTrackingContext = new Container(uri)
             {
                 MergeOption = MergeOption.NoTracking
             };
@@ -122,66 +124,75 @@
         [Fact]
         public void TestAddingBehaviourShouldNotBeModified()
         {
-            SetupContextWithRequestPipeline(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext }, false);
+            SetupContextWithRequestPipeline(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext }, false);
 
             var users = DefaultTrackingContext.Users;
-            var users2 = NoNTrackingContext.Users;
-            Assert.Equal(users.ToImmutableList().Count, users2.ToImmutableList().Count);
+            var users2 = NonTrackingContext.Users;
+            Assert.Equal(users.ToList().Count, users2.ToList().Count);
 
 
             //  entities should be tracked by no tracking context
-            Assert.Equal(0, NoNTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
-            Assert.Equal(3, DefaultTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
-            Assert.Equal(0, NoNTrackingContext.Entities.Count);
+            Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.Count());
+            Assert.Equal(3, DefaultTrackingContext.EntityTracker.Entities.Count());
+            Assert.Equal(0, NonTrackingContext.Entities.Count);
             Assert.Equal(3, DefaultTrackingContext.Entities.Count);
         }
+
         [Fact]
         public void TrackMediaEntitiesShouldBePopulatedWithMediaEntities()
         {
-            SetupContextWithRequestPipeline(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext }, true);
+            SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, true);
 
-            var mLeItems = DefaultTrackingContext.Documents;
-            var mleNoTracking = NoNTrackingContext.Documents;
-            // data should be equals
-            Assert.Equal(mleNoTracking.ToImmutableList().Count, mLeItems.ToImmutableList().Count);
+            var mleNoTracking = NonTrackingContext.Documents.ToList();
 
-            Assert.Equal(0, NoNTrackingContext.EntityTracker.Entities.ToImmutableList().Count);
-            Assert.Equal(mLeItems.ToImmutableList().Count, DefaultTrackingContext.Entities.ToImmutableList().Count);
-            var entityDescriptors = DefaultTrackingContext.EntityTracker.Entities.ToImmutableList();
-            Assert.Equal(mLeItems.ToImmutableList().Count, entityDescriptors.Count);
-
-            foreach (var entityDescriptor in entityDescriptors)
-            {
-                Assert.Equal(EntityStates.Unchanged, entityDescriptor.State);
-                Assert.NotNull(entityDescriptor.ReadStreamUri);
-            }
+            Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.Count());
 
             // verify that the stream links are equal 
             foreach (var document in mleNoTracking)
             {
                 var doc = document as BaseEntityType;
                 Assert.NotNull(doc.StreamDescriptor.SelfLink);
-                Assert.NotNull(NoNTrackingContext.GetReadStreamUri(document));
+                Assert.NotNull(NonTrackingContext.GetReadStreamUri(document));
 
                 //try and get the content and verify that the content matches the values
-                Stream result = GetTestReadStreamResult(NoNTrackingContext, document);
+                Stream result = GetTestReadStreamResult(NonTrackingContext, document);
 
                 Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
 
             }
-
-
-
-
-
         }
 
-        private Stream GetTestReadStreamResult(DataServiceContext dataServiceContext, Document document)
+        [Fact]
+        public void TrackMediaEntitiesShouldFailForNonMleEntitiesWithoutDescriptors()
+        {
+            SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, false);
+
+            var entities = NonTrackingContext.Users.ToList();
+
+            Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.Count());
+
+            // verify that the stream links are equal 
+            foreach (var entity in entities)
+            {
+                var doc = entity as BaseEntityType;
+                Assert.Null(doc.StreamDescriptor);
+                Action act1 = () => NonTrackingContext.GetReadStreamUri(entity);
+
+                act1.ShouldThrow<InvalidOperationException>(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
+                //try and get the content and verify that the content matches the values
+                Action act2 = () => GetTestReadStreamResult(NonTrackingContext, entity);
+                act2.ShouldThrow<InvalidOperationException>().WithMessage(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
+
+            }
+        }
+
+        private Stream GetTestReadStreamResult(DataServiceContext dataServiceContext, object entity)
         {
             dataServiceContext.Configurations.RequestPipeline.OnMessageCreating = args =>
             {
+                var baseEntity = entity as BaseEntityType;
                 // if we read the wrong link then reply with gibberish
-                var resp = (args.RequestUri == document.StreamDescriptor.SelfLink) ? AttatchmentResponse : "gibberish";
+                var resp = (args.RequestUri == baseEntity?.StreamDescriptor?.SelfLink) ? AttatchmentResponse : "gibberish";
 
                 return new CustomizedRequestMessage(
                     args,
@@ -189,25 +200,22 @@
                     new Dictionary<string, string>
                     {
                             {"Content-Type", "text/plain"}
-
                     });
-
-
             };
 
 
-            var streamResponse = dataServiceContext.GetReadStream(document, new DataServiceRequestArgs());
+            var streamResponse = dataServiceContext.GetReadStream(entity, new DataServiceRequestArgs());
             return streamResponse.Stream;
 
         }
 
         [Theory]
         [InlineData(false, 1, 1)]
-        public async void TestAddingNewItemsBehaviourShouldBeUnAltered(bool isMle, int expectedNoTracking,
+        public void TestAddingNewItemsBehaviourShouldBeUnAltered(bool isMle, int expectedNoTracking,
             int expectedTrackingMle)
         {
             SetupContextWithRequestPipelineForSaving(
-                new DataServiceContext[] { NoNTrackingContext, DefaultTrackingContext }, isMle);
+                new DataServiceContext[] { NonTrackingContext, DefaultTrackingContext }, isMle);
             var document = new Document
             {
                 Id = 1,
@@ -226,33 +234,32 @@
 
                 DefaultTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
 
-                NoNTrackingContext.AddObject("Documents", document);
-                NoNTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
+                NonTrackingContext.AddObject("Documents", document);
+                NonTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
 
             }
             else
             {
                 DefaultTrackingContext.AddObject("Users", user);
-                NoNTrackingContext.AddObject("Users", user);
-                Assert.NotNull(NoNTrackingContext.GetEntityDescriptor(user));
+                NonTrackingContext.AddObject("Users", user);
+                Assert.NotNull(NonTrackingContext.GetEntityDescriptor(user));
                 Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
 
             }
 
 
+            SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext });
 
-            await SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NoNTrackingContext });
-
-            Assert.Equal(expectedTrackingMle, DefaultTrackingContext.Entities.ToImmutableList().Count);
-            Assert.Equal(expectedNoTracking, NoNTrackingContext.Entities.ToImmutableList().Count);
+            Assert.Equal(expectedTrackingMle, DefaultTrackingContext.Entities.Count());
+            Assert.Equal(expectedNoTracking, NonTrackingContext.Entities.Count);
 
         }
 
-        private async Task SaveContextChanges(DataServiceContext[] dataServiceContexts)
+        private void SaveContextChanges(DataServiceContext[] dataServiceContexts)
         {
             foreach (var dataServiceContext in dataServiceContexts)
             {
-                await dataServiceContext.SaveChangesAsync();
+                dataServiceContext.SaveChanges();
             }
         }
 
@@ -358,8 +365,7 @@
             return new HttpWebResponseMessage(
                 CustomizedHeaders,
                 200,
-                () =>
-                GetStream());
+                GetStream);
         }
 
     }

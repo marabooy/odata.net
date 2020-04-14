@@ -597,6 +597,15 @@ namespace Microsoft.OData.Client {
         }
 
         /// <summary>
+        /// A string like "The context is in non tracking mode, The entity does not seem to have the media links populated properly. Please verify server response is correct and that the entity extends BaseEntityType."
+        /// </summary>
+        internal static string Context_EntityInNonTrackedContextLacksMediaLinks {
+            get {
+                return Microsoft.OData.Client.TextRes.GetString(Microsoft.OData.Client.TextRes.Context_EntityInNonTrackedContextLacksMediaLinks);
+            }
+        }
+
+        /// <summary>
         /// A string like "When you call the UseJson method without a parameter, you must use the LoadServiceModel property to provide a valid IEdmModel instance."
         /// </summary>
         internal static string DataServiceClientFormat_LoadServiceModelRequired {

@@ -1263,7 +1263,12 @@ namespace Microsoft.OData.Client
                     throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
                 }
 
-                box = baseEntity.StreamDescriptor.EntityDescriptor;
+                box = baseEntity?.StreamDescriptor?.EntityDescriptor;
+
+                if (box == null)
+                {
+                    throw Error.InvalidOperation(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
+                }
             }
             else
             {
@@ -3325,7 +3330,7 @@ namespace Microsoft.OData.Client
 
                 if (entityDescriptor == null)
                 {
-                    throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
+                    throw Error.InvalidOperation(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
 
                 }
             }           
