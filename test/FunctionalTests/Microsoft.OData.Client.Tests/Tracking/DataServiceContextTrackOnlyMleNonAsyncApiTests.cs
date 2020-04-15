@@ -111,7 +111,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
         #endregion
         private const string AttatchmentResponse = "Hello World!";
 
-
         public DataServiceContextTrackOnlyMleTests()
         {
             var uri = new Uri("http://localhost:8000");
@@ -167,7 +166,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
         public void TrackMediaEntitiesShouldFailForNonMleEntitiesWithoutDescriptors()
         {
             SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, false);
-
             var entities = NonTrackingContext.Users.ToList();
 
             Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.Count());
@@ -183,7 +181,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 //try and get the content and verify that the content matches the values
                 Action act2 = () => GetTestReadStreamResult(NonTrackingContext, entity);
                 act2.ShouldThrow<InvalidOperationException>().WithMessage(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
-
             }
         }
 
@@ -225,10 +222,8 @@ namespace Microsoft.OData.Client.Tests.Tracking
             Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
 
             SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext });
-
             Assert.Equal(1, DefaultTrackingContext.Entities.Count);
             Assert.Equal(1, NonTrackingContext.Entities.Count);
-
         }
 
         private void SaveContextChanges(DataServiceContext[] dataServiceContexts)
@@ -254,16 +249,12 @@ namespace Microsoft.OData.Client.Tests.Tracking
                         {
                             {"Content-Type", "application/json;charset=utf-8"},
                             { "Location", location }
-
                         });
             }
-
         }
-
 
         private void SetupContextWithRequestPipeline(DataServiceContext[] dataServiceContexts, bool forMle)
         {
-
             var response = forMle ? DOCUMENTS_RESPONSE : USERS_RESPONSE;
 
             foreach (var context in dataServiceContexts)
@@ -277,13 +268,10 @@ namespace Microsoft.OData.Client.Tests.Tracking
                                 {"Content-Type", "application/json;charset=utf-8"}
                         });
             }
-
         }
-
 
         class Container : DataServiceContext
         {
-
             public Container(Uri serviceRoot) :
                 base(serviceRoot, ODataProtocolVersion.V4)
             {
@@ -292,7 +280,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 Users = CreateQuery<User>("Users");
                 Documents = CreateQuery<Document>("Documents");
             }
-
             public DataServiceQuery<User> Users { get; private set; }
             public DataServiceQuery<Document> Documents { get; private set; }
         }
@@ -323,7 +310,8 @@ namespace Microsoft.OData.Client.Tests.Tracking
         {
         }
 
-        public CustomizedRequestMessage(DataServiceClientRequestMessageArgs args, string response, Dictionary<string, string> headers)
+        public CustomizedRequestMessage(DataServiceClientRequestMessageArgs args, string response,
+            Dictionary<string, string> headers)
             : base(args)
         {
             Response = response;
@@ -343,7 +331,5 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 200,
                 GetStream);
         }
-
     }
-
 }
