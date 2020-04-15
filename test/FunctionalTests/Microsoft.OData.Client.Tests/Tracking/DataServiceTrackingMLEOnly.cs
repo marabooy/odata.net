@@ -1,4 +1,9 @@
-﻿
+﻿//---------------------------------------------------------------------
+// <copyright file="DataServiceContextTrackOnlyMle.cs" company="Microsoft">
+//      Copyright (C) Microsoft Corporation. All rights reserved. See License.txt in the project root for license information.
+// </copyright>
+//---------------------------------------------------------------------
+
 namespace Microsoft.OData.Client.Tests.Tracking
 {
     using Edm.Csdl;
@@ -48,7 +53,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 </edmx:Edmx>";
 
         #endregion
-
 
         #region responses
 
@@ -106,8 +110,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
         #endregion
         private const string AttatchmentResponse = "Hello World!";
-
-
+        
         public DataServiceContextTrackOnlyMleTests()
         {
             var uri = new Uri("http://localhost:8000");
@@ -160,7 +163,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
             }
 
-
         }
 
         private async Task<Stream> GetTestReadStreamResult(DataServiceContext dataServiceContext, Document document)
@@ -188,50 +190,25 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
         }
 
-        [Theory]
-        [InlineData(false, 1, 1)]
-        public async void TestAddingNewItemsBehaviourShouldBeUnAltered(bool isMle, int expectedNoTracking,
-            int expectedTrackingMle)
+        [Fact]
+        public async void TestAddingNewItemsBehaviourShouldBeUnAltered()
         {
             SetupContextWithRequestPipelineForSaving(
-                new DataServiceContext[] { NonTrackingContext, DefaultTrackingContext }, isMle);
-            var document = new Document
-            {
-                Id = 1,
-                FileLength = 0,
-                Name = "New Document"
-            };
+                new DataServiceContext[] { NonTrackingContext, DefaultTrackingContext }, false);
 
             var user = new User
             {
                 Name = "Some name"
             };
-            if (isMle)
-            {
 
-                DefaultTrackingContext.AddObject("Documents", document);
-
-                DefaultTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
-
-                NonTrackingContext.AddObject("Documents", document);
-                NonTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
-
-            }
-            else
-            {
-                DefaultTrackingContext.AddObject("Users", user);
-                NonTrackingContext.AddObject("Users", user);
-                Assert.NotNull(NonTrackingContext.GetEntityDescriptor(user));
-                Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
-
-            }
-
-
+            DefaultTrackingContext.AddObject("Users", user);
+            NonTrackingContext.AddObject("Users", user);
+            Assert.NotNull(NonTrackingContext.GetEntityDescriptor(user));
+            Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
 
             await SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext });
-
-            Assert.Equal(expectedTrackingMle, DefaultTrackingContext.Entities.ToList().Count);
-            Assert.Equal(expectedNoTracking, NonTrackingContext.Entities.ToList().Count);
+            Assert.Equal(1, DefaultTrackingContext.Entities.ToList().Count);
+            Assert.Equal(1, NonTrackingContext.Entities.ToList().Count);
 
         }
 
@@ -261,9 +238,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
                         });
             }
-
         }
-
 
         private void SetupContextWithRequestPipeline(DataServiceContext[] dataServiceContexts, bool forMle)
         {
@@ -281,13 +256,11 @@ namespace Microsoft.OData.Client.Tests.Tracking
                                 {"Content-Type", "application/json;charset=utf-8"},
                         });
             }
-
         }
 
 
         class Container : DataServiceContext
         {
-
             public Container(global::System.Uri serviceRoot) :
                 base(serviceRoot, ODataProtocolVersion.V4)
             {
@@ -296,7 +269,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 this.Users = base.CreateQuery<User>("Users");
                 this.Documents = base.CreateQuery<Document>("Documents");
             }
-
             public DataServiceQuery<User> Users { get; private set; }
             public DataServiceQuery<Document> Documents { get; private set; }
         }
@@ -349,7 +321,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
         public override IAsyncResult BeginGetResponse(AsyncCallback callback, object state)
         {
-
             var tcs = new TaskCompletionSource<bool>(state);
             tcs.TrySetResult(true);
             callback(tcs.Task);

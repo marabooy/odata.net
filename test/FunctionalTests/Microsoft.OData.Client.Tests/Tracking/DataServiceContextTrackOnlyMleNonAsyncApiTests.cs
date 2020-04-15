@@ -1,21 +1,25 @@
-﻿
-using FluentAssertions;
+﻿//---------------------------------------------------------------------
+// <copyright file="DataServiceContextTrackOnlyMleNonAsyncApiTests.cs" company="Microsoft">
+//      Copyright (C) Microsoft Corporation. All rights reserved. See License.txt in the project root for license information.
+// </copyright>
+//---------------------------------------------------------------------
 
 namespace Microsoft.OData.Client.Tests.Tracking
 {
+    using FluentAssertions;
+    using Microsoft.OData.Edm.Csdl;
     using System;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
     using System.Text;
     using System.Xml;
-    using Microsoft.OData.Edm.Csdl;
     using Xunit;
 
     public class DataServiceContextTrackOnlyMleTests
     {
-        private Container NonTrackingContext;
-        private Container DefaultTrackingContext;
+        private readonly Container NonTrackingContext;
+        private readonly Container DefaultTrackingContext;
 
         #region TestEDMX 
 
@@ -49,7 +53,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 </edmx:Edmx>";
 
         #endregion
-
 
         #region responses
 
@@ -130,8 +133,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             var users2 = NonTrackingContext.Users;
             Assert.Equal(users.ToList().Count, users2.ToList().Count);
 
-
-            //  entities should be tracked by no tracking context
+            // no entities should be tracked by NonTrackingContext
             Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.Count());
             Assert.Equal(3, DefaultTrackingContext.EntityTracker.Entities.Count());
             Assert.Equal(0, NonTrackingContext.Entities.Count);
@@ -158,7 +160,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 Stream result = GetTestReadStreamResult(NonTrackingContext, document);
 
                 Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
-
             }
         }
 
@@ -203,55 +204,30 @@ namespace Microsoft.OData.Client.Tests.Tracking
                     });
             };
 
-
             var streamResponse = dataServiceContext.GetReadStream(entity, new DataServiceRequestArgs());
             return streamResponse.Stream;
-
         }
 
-        [Theory]
-        [InlineData(false, 1, 1)]
-        public void TestAddingNewItemsBehaviourShouldBeUnAltered(bool isMle, int expectedNoTracking,
-            int expectedTrackingMle)
+        [Fact]
+        public void TestAddingNewItemsBehaviourShouldBeUnAltered()
         {
             SetupContextWithRequestPipelineForSaving(
-                new DataServiceContext[] { NonTrackingContext, DefaultTrackingContext }, isMle);
-            var document = new Document
-            {
-                Id = 1,
-                FileLength = 0,
-                Name = "New Document"
-            };
+                new DataServiceContext[] { NonTrackingContext, DefaultTrackingContext }, false);
 
             var user = new User
             {
                 Name = "Some name"
             };
-            if (isMle)
-            {
 
-                DefaultTrackingContext.AddObject("Documents", document);
-
-                DefaultTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
-
-                NonTrackingContext.AddObject("Documents", document);
-                NonTrackingContext.SetSaveStream(document, new MemoryStream(new byte[] { 64, 65, 66 }), true, "image/png", "UnitTestLogo.png");
-
-            }
-            else
-            {
-                DefaultTrackingContext.AddObject("Users", user);
-                NonTrackingContext.AddObject("Users", user);
-                Assert.NotNull(NonTrackingContext.GetEntityDescriptor(user));
-                Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
-
-            }
-
+            DefaultTrackingContext.AddObject("Users", user);
+            NonTrackingContext.AddObject("Users", user);
+            Assert.NotNull(NonTrackingContext.GetEntityDescriptor(user));
+            Assert.NotNull(DefaultTrackingContext.GetEntityDescriptor(user));
 
             SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext });
 
-            Assert.Equal(expectedTrackingMle, DefaultTrackingContext.Entities.Count());
-            Assert.Equal(expectedNoTracking, NonTrackingContext.Entities.Count);
+            Assert.Equal(1, DefaultTrackingContext.Entities.Count);
+            Assert.Equal(1, NonTrackingContext.Entities.Count);
 
         }
 
