@@ -322,7 +322,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
         public override IODataResponseMessage EndGetResponse(IAsyncResult asyncResult)
         {
-            System.Threading.Thread.Sleep(1000);
             return GetResponse();
         }
     }
