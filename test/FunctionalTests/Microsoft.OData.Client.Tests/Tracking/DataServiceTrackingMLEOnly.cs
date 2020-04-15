@@ -146,7 +146,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
             var mleNoTracking = NonTrackingContext.Documents.ExecuteAsync().GetAwaiter().GetResult().ToList();
 
-
             Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.ToList().Count);
 
             // verify that the stream links are equal 
@@ -160,9 +159,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 Stream result = GetTestReadStreamResult(NonTrackingContext, document).GetAwaiter().GetResult();
 
                 Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
-
             }
-
         }
 
         private async Task<Stream> GetTestReadStreamResult(DataServiceContext dataServiceContext, Document document)
@@ -187,7 +184,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
             var streamResponse = await dataServiceContext.GetReadStreamAsync(document, new DataServiceRequestArgs());
             return streamResponse.Stream;
-
         }
 
         [Fact]
@@ -209,7 +205,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
             await SaveContextChanges(new DataServiceContext[] { DefaultTrackingContext, NonTrackingContext });
             Assert.Equal(1, DefaultTrackingContext.Entities.ToList().Count);
             Assert.Equal(1, NonTrackingContext.Entities.ToList().Count);
-
         }
 
         private async Task SaveContextChanges(DataServiceContext[] dataServiceContexts)
@@ -257,7 +252,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                         });
             }
         }
-
 
         class Container : DataServiceContext
         {
@@ -318,7 +312,6 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 });
         }
 
-
         public override IAsyncResult BeginGetResponse(AsyncCallback callback, object state)
         {
             var tcs = new TaskCompletionSource<bool>(state);
@@ -333,5 +326,4 @@ namespace Microsoft.OData.Client.Tests.Tracking
             return GetResponse();
         }
     }
-
 }

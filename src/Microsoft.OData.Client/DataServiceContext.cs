@@ -3331,9 +3331,9 @@ namespace Microsoft.OData.Client
                 if (entityDescriptor == null)
                 {
                     throw Error.InvalidOperation(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
-
                 }
-            }           
+            }
+            
             Uri requestUri;
             Version version;
             if (name == null)

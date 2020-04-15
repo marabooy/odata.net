@@ -4,8 +4,6 @@
 // </copyright>
 //---------------------------------------------------------------------
 
-using Microsoft.OData.Edm;
-
 namespace Microsoft.OData.Client
 {
     #region Namespaces
@@ -13,11 +11,12 @@ namespace Microsoft.OData.Client
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using Microsoft.OData.Client.Materialization;
-    using Microsoft.OData.Client.Metadata;
     using System.Diagnostics;
     using System.Xml;
     using Microsoft.OData;
+    using Microsoft.OData.Client.Materialization;
+    using Microsoft.OData.Client.Metadata;
+    using Microsoft.OData.Edm;
 
     #endregion Namespaces
 
@@ -351,9 +350,7 @@ namespace Microsoft.OData.Client
                         if (entity != null)
                         {
                             entity.Context = this.responseInfo.Context;
-                            
                             ODataResource resource = this.materializer.CurrentEntry;
-
                             ClientEdmModel model = Context.Model;
 
                             IEdmEntityType type = model.FindDeclaredType(resource.TypeName) as IEdmEntityType;
@@ -391,8 +388,6 @@ namespace Microsoft.OData.Client
                                         entity.StreamDescriptor.ContentType = resource.MediaResource.ContentType;
                                     }
                                 }
-
-
                             }
                         }
 
