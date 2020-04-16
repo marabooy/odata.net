@@ -71,21 +71,21 @@ namespace Microsoft.OData.Client.Tests.Tracking
   ""value"": [
     {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/1/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 1,
       ""Name"": ""Sample Doc 1"",
       ""FileLength"": 0
     },
    {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/2/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 2,
       ""Name"": ""Sample Doc 2"",
       ""FileLength"": 0
     },
     {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/3/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 3,
       ""Name"": ""Sample Doc 3"",
       ""FileLength"": 0
@@ -96,7 +96,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
         private const string DOCUMENT_RESPONSE = @"{
       ""@odata.context"": ""https://localhost:8000/$metadata#Documents/$entity"",
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/1/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 1,
       ""Name"": ""Sample Doc 1"",
       ""FileLength"": 0
@@ -176,9 +176,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 var doc = entity as BaseEntityType;
                 Assert.Null(doc.EntityDescriptor);
                 Action act1 = () => NonTrackingContext.GetReadStreamUri(entity);
-
                 act1.ShouldThrow<InvalidOperationException>(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
-                //try and get the content and verify that the content matches the values
                 Action act2 = () => GetTestReadStreamResult(NonTrackingContext, entity);
                 act2.ShouldThrow<InvalidOperationException>().WithMessage(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
             }

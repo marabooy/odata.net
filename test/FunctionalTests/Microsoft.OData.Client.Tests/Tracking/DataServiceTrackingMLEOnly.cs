@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------
-// <copyright file="DataServiceContextTrackOnlyMle.cs" company="Microsoft">
+// <copyright file="DataServiceContextNoTrackingStreamsTests.cs" company="Microsoft">
 //      Copyright (C) Microsoft Corporation. All rights reserved. See License.txt in the project root for license information.
 // </copyright>
 //---------------------------------------------------------------------
@@ -17,7 +17,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
     using System.Xml;
     using Xunit;
 
-    public class DataServiceContextTrackOnlyMleTests
+    public class DataServiceContextNoTrackingStreamsTests
     {
         private Container NonTrackingContext;
         private Container DefaultTrackingContext;
@@ -107,21 +107,21 @@ namespace Microsoft.OData.Client.Tests.Tracking
   ""value"": [
     {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/1/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 1,
       ""Name"": ""Sample Doc 1"",
       ""FileLength"": 0
     },
    {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/2/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 2,
       ""Name"": ""Sample Doc 2"",
       ""FileLength"": 0
     },
     {
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/3/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 3,
       ""Name"": ""Sample Doc 3"",
       ""FileLength"": 0
@@ -132,7 +132,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
         private const string DOCUMENT_RESPONSE = @"{
       ""@odata.context"": ""https://localhost:8000/$metadata#Documents/$entity"",
       ""@odata.mediaReadLink"": ""https://localhost:8000/Documents/1/content"",
-      ""@odata.mediaContentType"": ""application/pdf"",
+      ""@odata.mediaContentType"": ""text/plain"",
       ""Id"": 1,
       ""Name"": ""Sample Doc 1"",
       ""FileLength"": 0
@@ -147,7 +147,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
         #endregion
         private const string AttachmentResponse = "Hello World!";
 
-        public DataServiceContextTrackOnlyMleTests()
+        public DataServiceContextNoTrackingStreamsTests()
         {
             var uri = new Uri("http://localhost:8000");
 
@@ -180,22 +180,22 @@ namespace Microsoft.OData.Client.Tests.Tracking
         {
             SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, true);
 
-            var mleNoTracking = NonTrackingContext.Documents.ExecuteAsync().GetAwaiter().GetResult().ToList();
+            var documents = NonTrackingContext.Documents.ExecuteAsync().GetAwaiter().GetResult().ToList();
 
             Assert.Equal(0, NonTrackingContext.EntityTracker.Entities.ToList().Count);
 
             // verify that the stream links are equal 
-            foreach (var document in mleNoTracking)
-            {
-                var doc = document as BaseEntityType;
-                Assert.NotNull(doc.EntityDescriptor);
-                Assert.NotNull(NonTrackingContext.GetReadStreamUri(document));
+            var document = documents.First();
+            var doc = (BaseEntityType) document;
+            Assert.NotNull(doc.EntityDescriptor);
+            Assert.NotNull(NonTrackingContext.GetReadStreamUri(document));
+            Assert.Equal("https://localhost:8000/Documents/1/content",NonTrackingContext.GetReadStreamUri(document).ToString());
 
-                //try and get the content and verify that the content matches the values
-                Stream result = GetTestReadStreamResult(NonTrackingContext, document).GetAwaiter().GetResult();
+            //try and get the content and verify that the content matches the values
+            Stream result = GetTestReadStreamResult(NonTrackingContext, document).GetAwaiter().GetResult();
 
-                Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
-            }
+            Assert.Equal("Hello World!", new StreamReader(result).ReadToEnd());
+
         }
 
         private async Task<Stream> GetTestReadStreamResult(DataServiceContext dataServiceContext, Document document)
@@ -262,7 +262,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
 
             var customers = await NonTrackingContext.Customers2.ExecuteAsync();
 
-            Action action =()=> NonTrackingContext.GetReadStreamUri(customers.First(), "ProfilePhoto");
+            Action action = () => NonTrackingContext.GetReadStreamUri(customers.First(), "ProfilePhoto");
             action.ShouldThrow<InvalidOperationException>()
                 .WithMessage(Strings.Context_EntityMediaLinksNotTrackedInEntity);
         }
