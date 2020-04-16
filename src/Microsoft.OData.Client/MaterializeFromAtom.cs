@@ -508,7 +508,7 @@ namespace Microsoft.OData.Client
 
                     default:
                         throw Error.InvalidOperation(Strings.Deserialize_ExpectingSimpleValue);
-                        #endregion
+                    #endregion
                 }
             }
 
