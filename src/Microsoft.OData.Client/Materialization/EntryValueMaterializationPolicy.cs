@@ -1,4 +1,4 @@
-﻿//---------------------------------------------------------------------
+//---------------------------------------------------------------------
 // <copyright file="EntryValueMaterializationPolicy.cs" company="Microsoft">
 //      Copyright (C) Microsoft Corporation. All rights reserved. See License.txt in the project root for license information.
 // </copyright>
@@ -14,7 +14,9 @@ namespace Microsoft.OData.Client.Materialization
     using Microsoft.OData;
     using Microsoft.OData.Client;
     using Microsoft.OData.Client.Metadata;
+    using Microsoft.OData.Edm;
     using DSClient = Microsoft.OData.Client;
+
 
     /// <summary>
     /// Used to materialize entities from an <see cref="ODataResource"/> to an object.
@@ -671,6 +673,17 @@ namespace Microsoft.OData.Client.Materialization
             if (entity != null)
             {
                 entity.Context = this.EntityTrackingAdapter.Context;
+                // if NoTracking
+                if (!entry.IsTracking)
+                {
+                    int? namedStreamDescriptors = entry.EntityDescriptor.StreamDescriptors?.Count;
+                    if ((namedStreamDescriptors.HasValue && namedStreamDescriptors.Value > 0) ||
+                        (this.EntityTrackingAdapter.Model.FindDeclaredType(entry.Entry.TypeName) is IEdmEntityType entityType && entityType.HasStream))
+                    {
+                        entity.EntityDescriptor = entry.EntityDescriptor;
+                    }
+                }
+
             }
 
             this.MaterializerContext.ResponsePipeline.FireEndEntryEvents(entry);

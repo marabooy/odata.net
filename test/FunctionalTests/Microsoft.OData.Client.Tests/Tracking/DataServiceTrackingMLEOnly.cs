@@ -1,4 +1,4 @@
-﻿//---------------------------------------------------------------------
+//---------------------------------------------------------------------
 // <copyright file="DataServiceContextTrackOnlyMle.cs" company="Microsoft">
 //      Copyright (C) Microsoft Corporation. All rights reserved. See License.txt in the project root for license information.
 // </copyright>
@@ -7,6 +7,7 @@
 namespace Microsoft.OData.Client.Tests.Tracking
 {
     using Edm.Csdl;
+    using FluentAssertions;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -34,6 +35,26 @@ namespace Microsoft.OData.Client.Tests.Tracking
         <Property Name=""Id"" Type=""Edm.Int32"" Nullable=""false"" />
         <Property Name=""Name"" Type=""Edm.String"" />
       </EntityType>
+     <EntityType Name=""Customer"">
+        <Key>
+          <PropertyRef Name=""Id"" />
+        </Key>
+        <Property Name=""Id"" Type=""Edm.Int32"" Nullable=""false"" />
+        <Property Name=""Name"" Type=""Edm.String"" Nullable=""false"" />
+        <Property Name=""ProfilePhoto"" Type=""Edm.Stream"" />
+        <Property Name=""VideoThumbnail"" Type=""Edm.Stream"" />
+        <Property Name=""ProfileVideo"" Type=""Edm.Stream"" />
+      </EntityType>
+      <EntityType Name=""Customer2"">
+        <Key>
+          <PropertyRef Name=""Id"" />
+        </Key>
+        <Property Name=""Id"" Type=""Edm.Int32"" Nullable=""false"" />
+        <Property Name=""Name"" Type=""Edm.String"" Nullable=""false"" />
+        <Property Name=""ProfilePhoto"" Type=""Edm.Stream"" />
+        <Property Name=""VideoThumbnail"" Type=""Edm.Stream"" />
+        <Property Name=""ProfileVideo"" Type=""Edm.Stream"" />
+      </EntityType>
       <EntityType Name=""Document"" HasStream=""true"">
         <Key>
           <PropertyRef Name=""Id"" />
@@ -47,6 +68,8 @@ namespace Microsoft.OData.Client.Tests.Tracking
       <EntityContainer Name=""Container"">
         <EntitySet Name=""Users"" EntityType=""Microsoft.OData.Client.Tests.Tracking.User"" />
         <EntitySet Name=""Documents"" EntityType=""Microsoft.OData.Client.Tests.Tracking.Document"" />
+        <EntitySet Name=""Customers"" EntityType=""Microsoft.OData.Client.Tests.Tracking.Customer"" />
+        <EntitySet Name=""Customers2"" EntityType=""Microsoft.OData.Client.Tests.Tracking.Customer2"" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>
@@ -65,6 +88,19 @@ namespace Microsoft.OData.Client.Tests.Tracking
         ]
 }
 ";
+        private string CUSTOMERS_RESPONSE = @"{
+  ""@odata.context"": ""https://localhost:8000/$metadata#Customers"",
+  ""value"": [
+    {
+      ""@odata.ProfilePhotoReadLink"": ""https://localhost:8000/Customers/1/ProfilePhoto"",
+      ""@odata.ProfilePhotoContentType"": ""image/jpg"",
+      ""Id"": 1,
+      ""Name"": ""Sample Doc 1"",
+      ""FileLength"": 0
+    }
+  ]
+}";
+
 
         private const string DOCUMENTS_RESPONSE = @"{
   ""@odata.context"": ""https://localhost:8000/$metadata#Documents"",
@@ -109,8 +145,8 @@ namespace Microsoft.OData.Client.Tests.Tracking
       }";
 
         #endregion
-        private const string AttatchmentResponse = "Hello World!";
-        
+        private const string AttachmentResponse = "Hello World!";
+
         public DataServiceContextTrackOnlyMleTests()
         {
             var uri = new Uri("http://localhost:8000");
@@ -152,7 +188,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             foreach (var document in mleNoTracking)
             {
                 var doc = document as BaseEntityType;
-                Assert.NotNull(doc.StreamDescriptor.SelfLink);
+                Assert.NotNull(doc.EntityDescriptor);
                 Assert.NotNull(NonTrackingContext.GetReadStreamUri(document));
 
                 //try and get the content and verify that the content matches the values
@@ -167,7 +203,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             dataServiceContext.Configurations.RequestPipeline.OnMessageCreating = args =>
             {
                 // if we read the wrong link then reply with gibberish
-                var resp = (args.RequestUri == document.StreamDescriptor.SelfLink) ? AttatchmentResponse : "gibberish";
+                var resp = (args.RequestUri == document.EntityDescriptor.ReadStreamUri) ? AttachmentResponse : "gibberish";
 
                 return new CustomizedRequestMessage(
                     args,
@@ -207,6 +243,30 @@ namespace Microsoft.OData.Client.Tests.Tracking
             Assert.Equal(1, NonTrackingContext.Entities.ToList().Count);
         }
 
+        [Fact]
+        public async void GetNamedStreamsShouldWorkInNoTrackingModeIfExtendsBaseEntity()
+        {
+            SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, true, true);
+
+            var customers = await NonTrackingContext.Customers.ExecuteAsync();
+
+            var photoUri = NonTrackingContext.GetReadStreamUri(customers.First(), "ProfilePhoto");
+            Assert.NotNull(photoUri);
+            Assert.Equal("https://localhost:8000/Customers(1)/ProfilePhoto", photoUri.ToString());
+        }
+
+        [Fact]
+        public async void GetNamedStreamsShouldNotWorkInNoTrackingModeIfNotExtendsBaseEntity()
+        {
+            SetupContextWithRequestPipeline(new DataServiceContext[] { NonTrackingContext }, true, true);
+
+            var customers = await NonTrackingContext.Customers2.ExecuteAsync();
+
+            Action action =()=> NonTrackingContext.GetReadStreamUri(customers.First(), "ProfilePhoto");
+            action.ShouldThrow<InvalidOperationException>()
+                .WithMessage(Strings.Context_EntityMediaLinksNotTrackedInEntity);
+        }
+
         private async Task SaveContextChanges(DataServiceContext[] dataServiceContexts)
         {
             foreach (var dataServiceContext in dataServiceContexts)
@@ -235,10 +295,11 @@ namespace Microsoft.OData.Client.Tests.Tracking
             }
         }
 
-        private void SetupContextWithRequestPipeline(DataServiceContext[] dataServiceContexts, bool forMle)
+        private void SetupContextWithRequestPipeline(DataServiceContext[] dataServiceContexts, bool forMle, bool forCustomers = false)
         {
 
-            var response = forMle ? DOCUMENTS_RESPONSE : USERS_RESPONSE;
+            var response = forMle ? (forCustomers ? CUSTOMERS_RESPONSE : DOCUMENTS_RESPONSE) : USERS_RESPONSE;
+
 
             foreach (var context in dataServiceContexts)
             {
@@ -262,13 +323,17 @@ namespace Microsoft.OData.Client.Tests.Tracking
                 this.Format.UseJson();
                 this.Users = base.CreateQuery<User>("Users");
                 this.Documents = base.CreateQuery<Document>("Documents");
+                this.Customers = base.CreateQuery<Customer>("Customers");
+                this.Customers2 = base.CreateQuery<Customer2>("Customers2");
             }
             public DataServiceQuery<User> Users { get; private set; }
             public DataServiceQuery<Document> Documents { get; private set; }
+            public DataServiceQuery<Customer> Customers { get; private set; }
+            public DataServiceQuery<Customer2> Customers2 { get; private set; }
         }
     }
     [Key("Id")]
-    [HasStream()]
+    [HasStream]
     internal class Document : BaseEntityType
     {
         public int Id { get; set; }
@@ -281,6 +346,26 @@ namespace Microsoft.OData.Client.Tests.Tracking
     {
         public int Id { get; set; }
         public string Name { get; set; }
+    }
+
+    [Key("Id")]
+    internal class Customer : BaseEntityType
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+
+        public DataServiceStreamLink ProfilePhoto { get; set; }
+        public DataServiceStreamLink ProfileVideo { get; set; }
+        public DataServiceStreamLink VideoThumbnail { get; set; }
+    }
+
+    internal class Customer2
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public DataServiceStreamLink ProfilePhoto { get; set; }
+        public DataServiceStreamLink ProfileVideo { get; set; }
+        public DataServiceStreamLink VideoThumbnail { get; set; }
     }
 
     public class CustomizedRequestMessage : HttpWebRequestMessage

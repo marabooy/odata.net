@@ -1248,10 +1248,15 @@ namespace Microsoft.OData.Client
         public Uri GetReadStreamUri(object entity)
         {
             Util.CheckArgumentNull(entity, "entity");
-            var box = GetEntityDescriptorForStreamEntity(entity);
+            EntityDescriptor box = GetEntityDescriptorForStreamEntity(entity);
             return box.ReadStreamUri;
         }
-
+        /// <summary>
+        /// This function is used to get the entity descriptor that is to be checked when trying to resolve streams.
+        /// For other use cases use the <see cref="GetEntityDescriptor"/> function
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <returns></returns>
         private EntityDescriptor GetEntityDescriptorForStreamEntity(object entity)
         {
             EntityDescriptor box;
@@ -1263,7 +1268,7 @@ namespace Microsoft.OData.Client
                     throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
                 }
 
-                box = baseEntity?.StreamDescriptor?.EntityDescriptor;
+                box = baseEntity?.EntityDescriptor;
 
                 if (box == null)
                 {
@@ -3310,30 +3315,9 @@ namespace Microsoft.OData.Client
             Util.CheckArgumentNull(entity, "entity");
             Util.CheckArgumentNull(args, "args");
 
-            EntityDescriptor entityDescriptor;
+            EntityDescriptor entityDescriptor = GetEntityDescriptorForStreamEntity(entity);
             StreamDescriptor streamDescriptor;
 
-            if (MergeOption != MergeOption.NoTracking)
-            {
-                entityDescriptor = this.entityTracker.GetEntityDescriptor(entity);
-            }
-            else
-            {
-                // this is the only way to opt into reading streams when not tracking
-                BaseEntityType baseEntity = entity as BaseEntityType;
-                if (baseEntity == null)
-                {
-                    throw Error.InvalidOperation(Strings.Context_EntityMediaLinksNotTrackedInEntity);
-                }
-
-                entityDescriptor = baseEntity?.StreamDescriptor?.EntityDescriptor;
-
-                if (entityDescriptor == null)
-                {
-                    throw Error.InvalidOperation(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
-                }
-            }
-            
             Uri requestUri;
             Version version;
             if (name == null)

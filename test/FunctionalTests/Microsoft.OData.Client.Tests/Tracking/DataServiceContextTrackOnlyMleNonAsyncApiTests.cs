@@ -152,7 +152,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             foreach (var document in mleNoTracking)
             {
                 var doc = document as BaseEntityType;
-                Assert.NotNull(doc.StreamDescriptor.SelfLink);
+                Assert.NotNull(doc.EntityDescriptor);
                 Assert.NotNull(NonTrackingContext.GetReadStreamUri(document));
 
                 //try and get the content and verify that the content matches the values
@@ -174,7 +174,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             foreach (var entity in entities)
             {
                 var doc = entity as BaseEntityType;
-                Assert.Null(doc.StreamDescriptor);
+                Assert.Null(doc.EntityDescriptor);
                 Action act1 = () => NonTrackingContext.GetReadStreamUri(entity);
 
                 act1.ShouldThrow<InvalidOperationException>(Strings.Context_EntityInNonTrackedContextLacksMediaLinks);
@@ -190,7 +190,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             {
                 var baseEntity = entity as BaseEntityType;
                 // if we read the wrong link then reply with gibberish
-                var resp = (args.RequestUri == baseEntity?.StreamDescriptor?.SelfLink) ? AttatchmentResponse : "gibberish";
+                var resp = (args.RequestUri == baseEntity?.EntityDescriptor.ReadStreamUri) ? AttatchmentResponse : "gibberish";
 
                 return new CustomizedRequestMessage(
                     args,
