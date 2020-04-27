@@ -677,8 +677,10 @@ namespace Microsoft.OData.Client.Materialization
                 if (!entry.IsTracking)
                 {
                     int? namedStreamDescriptors = entry.EntityDescriptor.StreamDescriptors?.Count;
+                    IEdmEntityType entityType =
+                        this.EntityTrackingAdapter.Model.FindDeclaredType(entry.Entry.TypeName) as IEdmEntityType;
                     if ((namedStreamDescriptors.HasValue && namedStreamDescriptors.Value > 0) ||
-                        (this.EntityTrackingAdapter.Model.FindDeclaredType(entry.Entry.TypeName) is IEdmEntityType entityType && entityType.HasStream))
+                        ( entityType != null && entityType.HasStream))
                     {
                         entity.EntityDescriptor = entry.EntityDescriptor;
                     }
