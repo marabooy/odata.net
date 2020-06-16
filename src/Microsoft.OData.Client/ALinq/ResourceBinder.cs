@@ -801,12 +801,7 @@ namespace Microsoft.OData.Client
 
         internal static Expression ApplyAggregation(MethodCallExpression mce, OData.UriParser.Aggregation.AggregationMethod aggregationMethod)
         {
-            if (mce.Arguments.Count > 0)
-            {
-
-            }
-
-            // ValidationRules.CheckOrderBy(mce, model);
+            // TODO: Add more validations?
 
             QueryableResourceExpression input;
             LambdaExpression le;
@@ -839,7 +834,7 @@ namespace Microsoft.OData.Client
 
             aggregations.Add(new ApplyQueryOptionExpression.Aggregation(selector, aggregationMethod));
 
-            // Create a copy of ResourceExpression?
+            // TODO: Create a copy of ResourceExpression?
 
             return input;
         }
