@@ -249,7 +249,6 @@ namespace Microsoft.OData.Client
             return nextTask;
         }
 
-#if !PORTABLELIB // Synchronous methods not available
         /// <summary>Executes the query and returns the results as a collection that implements IEnumerable.</summary>
         /// <returns>An <see cref="System.Collections.Generic.IEnumerable{T}" /> in which TElement represents the type of the query results.</returns>
         /// <exception cref="Microsoft.OData.Client.DataServiceQueryException">When the data service returns an HTTP 404: Resource Not Found error.</exception>
@@ -275,7 +274,6 @@ namespace Microsoft.OData.Client
             QueryOperationResponse<TElement> response = this.Execute<TElement>(this.Context, this.Translate());
             return this.GetRestPages(response);
         }
-#endif
 
         /// <summary>Expands a query to include entities from a related entity set in the query response.</summary>
         /// <returns>A new query that includes the requested $expand query option appended to the URI of the supplied query.</returns>
@@ -367,17 +365,10 @@ namespace Microsoft.OData.Client
 
         /// <summary>Executes the query and returns the results as a collection.</summary>
         /// <returns>A typed enumerator over the results in which TElement represents the type of the query results.</returns>
-#if !PORTABLELIB // Synchronous methods not available
         public virtual IEnumerator<TElement> GetEnumerator()
         {
             return this.Execute().GetEnumerator();
         }
-#else
-        public IEnumerator<TElement> GetEnumerator()
-        {
-            throw Error.NotSupported(Strings.DataServiceQuery_EnumerationNotSupported);
-        }
-#endif
 
         /// <summary>Represents the URI of the query to the data service.</summary>
         /// <returns>A URI as string that represents the query to the data service for this <see cref="Microsoft.OData.Client.DataServiceQuery{TElement}" /> instance.</returns>
@@ -395,13 +386,9 @@ namespace Microsoft.OData.Client
 
         /// <summary>Executes the query and returns the results as a collection.</summary>
         /// <returns>An enumerator over the query results.</returns>
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        IEnumerator System.Collections.IEnumerable.GetEnumerator()
         {
-#if !PORTABLELIB // Synchronous methods not available
             return this.GetEnumerator();
-#else
-            throw Error.NotSupported();
-#endif
         }
 
         /// <summary>
@@ -414,7 +401,6 @@ namespace Microsoft.OData.Client
             return this.Translate();
         }
 
-#if !PORTABLELIB
         /// Synchronous methods not available
         /// <summary>
         /// Returns an IEnumerable from an Internet resource.
@@ -424,7 +410,6 @@ namespace Microsoft.OData.Client
         {
             return this.Execute();
         }
-#endif
 
         /// <summary>
         /// Begins an asynchronous request to an Internet resource.
@@ -486,7 +471,6 @@ namespace Microsoft.OData.Client
             }
         }
 
-#if !PORTABLELIB
         /// Synchronous methods not available
         /// <summary>
         /// Returns an IEnumerable from an Internet resource.
@@ -512,7 +496,6 @@ namespace Microsoft.OData.Client
                 continuation = (response as QueryOperationResponse<TElement>).GetContinuation();
             }
         }
-#endif
 
         /// <summary>
         /// Ordered DataServiceQuery which implements IOrderedQueryable.

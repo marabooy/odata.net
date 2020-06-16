@@ -18,6 +18,7 @@ namespace Microsoft.OData.Client
     using System.Reflection;
     using System.Text;
     using Microsoft.OData.Client.Metadata;
+    using Microsoft.OData.UriParser.Aggregation;
 
     #endregion Namespaces
 
@@ -409,6 +410,9 @@ namespace Microsoft.OData.Client
                             case ResourceExpressionType.FilterQueryOption:
                                 this.VisitQueryOptionExpression((FilterQueryOptionExpression)e);
                                 break;
+                            case ResourceExpressionType.ApplyQueryOption:
+                                this.VisitQueryOptionExpression((ApplyQueryOptionExpression)e);
+                                break;
                             default:
                                 Debug.Assert(false, "Unexpected expression type " + ((int)et).ToString(CultureInfo.InvariantCulture));
                                 break;
@@ -439,7 +443,7 @@ namespace Microsoft.OData.Client
                 if (re.CustomQueryOptions.Count > 0)
                 {
                     this.VisitCustomQueryOptions(re.CustomQueryOptions);
-                    }
+                }
 
                 this.AppendCachedQueryOptionsToUriBuilder();
                 }
@@ -580,6 +584,54 @@ namespace Microsoft.OData.Client
                 string v = values[i].Value + "";
                 this.AddAsCachedQueryOption(k, v);
             }
+        }
+
+        /// <summary>
+        /// ApplyQueryOptionExpression visit method.
+        /// </summary>
+        /// <param name="aqoe">ApplyQueryOptionExpression expression to visit</param>
+        internal void VisitQueryOptionExpression(ApplyQueryOptionExpression aqoe)
+        {
+            StringBuilder tmpBuilder = new StringBuilder();
+            tmpBuilder.Append(UriHelper.AGGREGATE);
+            tmpBuilder.Append(UriHelper.LEFTPAREN);
+            int idx = 0;
+            while (true)
+            {
+                ApplyQueryOptionExpression.Aggregation aggregation = aqoe.Aggregations[idx];
+                AggregationMethod aggregationMethod = aggregation.AggregationMethod;
+                string aggregationProperty = this.ExpressionToString(aggregation.Expression, /*inPath*/ false);
+                
+                // E.g. Amount with sum as SumAmount (For $count aggregation: $count as Count)
+                if (aggregationMethod != AggregationMethod.VirtualPropertyCount)
+                {
+                    tmpBuilder.Append(aggregationProperty);
+                    tmpBuilder.Append(UriHelper.SPACE);
+                    tmpBuilder.Append(UriHelper.WITH);
+                    tmpBuilder.Append(UriHelper.SPACE);
+                }
+
+                tmpBuilder.Append(aggregationMethod.ToUriEquivalent());
+                tmpBuilder.Append(UriHelper.SPACE);
+                tmpBuilder.Append(UriHelper.AS);
+                tmpBuilder.Append(UriHelper.SPACE);
+                // MUST define an alias for the resulting aggregate value
+                // Concatenate aggregation method with aggregation property to generate a simple identifier/alias
+                // OASIS Standard: The alias MUST NOT collide with names of declared properties, custom aggregates, or other aliases in that type
+                // TODO: Strategy to avoid name collision - Append a Guid?
+                string aggregateAlias = aggregationMethod.ToString() + aggregationProperty.Replace('/', '_');
+                tmpBuilder.Append(aggregateAlias);
+
+                if (++idx == aqoe.Aggregations.Count)
+                {
+                    break;
+                }
+
+                tmpBuilder.Append(UriHelper.COMMA);
+            }
+            tmpBuilder.Append(UriHelper.RIGHTPAREN);
+
+            this.AddAsCachedQueryOption(UriHelper.DOLLARSIGN + UriHelper.OPTIONAPPLY, tmpBuilder.ToString());
         }
 
         /// <summary>

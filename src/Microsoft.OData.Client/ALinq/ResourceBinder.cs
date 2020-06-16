@@ -799,6 +799,51 @@ namespace Microsoft.OData.Client
             return input;
         }
 
+        internal static Expression ApplyAggregation(MethodCallExpression mce, OData.UriParser.Aggregation.AggregationMethod aggregationMethod)
+        {
+            if (mce.Arguments.Count > 0)
+            {
+
+            }
+
+            // ValidationRules.CheckOrderBy(mce, model);
+
+            QueryableResourceExpression input;
+            LambdaExpression le;
+            if (!TryGetResourceSetMethodArguments(mce, out input, out le))
+            {
+                // UNSUPPORTED: Expected LambdaExpression as second argument to sequence method
+                return mce;
+            }
+
+            ValidationRules.DisallowExpressionEndWithTypeAs(le.Body, mce.Method.Name);
+
+            Expression selector;
+            if (!TryBindToInput(input, le, out selector))
+            {
+                // UNSUPPORTED: Lambda should reference the input, and only the input
+                return mce;
+            }
+
+            List<ApplyQueryOptionExpression.Aggregation> aggregations;
+            if (input.Apply == null)
+            {
+                aggregations = new List<ApplyQueryOptionExpression.Aggregation>();
+                AddSequenceQueryOption(input, new ApplyQueryOptionExpression(mce.Type, aggregations));
+            }
+            else
+            {
+                Debug.Assert(input.Apply != null, "input.Apply != null");
+                aggregations = input.Apply.Aggregations;
+            }
+
+            aggregations.Add(new ApplyQueryOptionExpression.Aggregation(selector, aggregationMethod));
+
+            // Create a copy of ResourceExpression?
+
+            return input;
+        }
+
         /// <summary>Ensures that there's a limit on the cardinality of a query.</summary>
         /// <param name="mce"><see cref="MethodCallExpression"/> for the method to limit First/Single(OrDefault).</param>
         /// <param name="maxCardinality">Maximum cardinality to allow.</param>
@@ -1486,6 +1531,50 @@ namespace Microsoft.OData.Client
                         case SequenceMethod.LongCount:
                         case SequenceMethod.Count:
                             return AnalyzeCountMethod(mce);
+                        case SequenceMethod.SumIntSelector:
+                        case SequenceMethod.SumDoubleSelector:
+                        case SequenceMethod.SumDecimalSelector:
+                        case SequenceMethod.SumLongSelector:
+                        case SequenceMethod.SumSingleSelector:
+                        case SequenceMethod.SumNullableIntSelector:
+                        case SequenceMethod.SumNullableDoubleSelector:
+                        case SequenceMethod.SumNullableDecimalSelector:
+                        case SequenceMethod.SumNullableLongSelector:
+                        case SequenceMethod.SumNullableSingleSelector:
+                            return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Sum);
+                        case SequenceMethod.AverageIntSelector:
+                        case SequenceMethod.AverageDoubleSelector:
+                        case SequenceMethod.AverageDecimalSelector:
+                        case SequenceMethod.AverageLongSelector:
+                        case SequenceMethod.AverageSingleSelector:
+                        case SequenceMethod.AverageNullableIntSelector:
+                        case SequenceMethod.AverageNullableDoubleSelector:
+                        case SequenceMethod.AverageNullableDecimalSelector:
+                        case SequenceMethod.AverageNullableLongSelector:
+                        case SequenceMethod.AverageNullableSingleSelector:
+                            return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Average);
+                        case SequenceMethod.MinSelector:
+                        case SequenceMethod.MinDoubleSelector:
+                        case SequenceMethod.MinDecimalSelector:
+                        case SequenceMethod.MinLongSelector:
+                        case SequenceMethod.MinSingleSelector:
+                        case SequenceMethod.MinNullableIntSelector:
+                        case SequenceMethod.MinNullableDoubleSelector:
+                        case SequenceMethod.MinNullableDecimalSelector:
+                        case SequenceMethod.MinNullableLongSelector:
+                        case SequenceMethod.MinNullableSingleSelector:
+                            return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Min);
+                        case SequenceMethod.MaxSelector:
+                        case SequenceMethod.MaxDoubleSelector:
+                        case SequenceMethod.MaxDecimalSelector:
+                        case SequenceMethod.MaxLongSelector:
+                        case SequenceMethod.MaxSingleSelector:
+                        case SequenceMethod.MaxNullableIntSelector:
+                        case SequenceMethod.MaxNullableDoubleSelector:
+                        case SequenceMethod.MaxNullableDecimalSelector:
+                        case SequenceMethod.MaxNullableLongSelector:
+                        case SequenceMethod.MaxNullableSingleSelector:
+                            return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Max);
                         default:
                             throw Error.MethodNotSupported(mce);
                     }
@@ -2702,6 +2791,10 @@ namespace Microsoft.OData.Client
                                 break;
                             case UriHelper.OPTIONFORMAT:
                                 ThrowNotSupportedExceptionForTheFormatOption();
+                                break;
+                            case UriHelper.OPTIONAPPLY:
+                                if (rse.Apply != null)
+                                    throw new NotSupportedException(Strings.ALinq_CantAddAstoriaQueryOption(name));
                                 break;
                             default:
                                 throw new NotSupportedException(Strings.ALinq_QueryOptionNotSupported(name));

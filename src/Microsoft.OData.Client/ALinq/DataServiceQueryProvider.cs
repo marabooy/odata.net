@@ -14,6 +14,7 @@ namespace Microsoft.OData.Client
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Newtonsoft.Json.Linq;
 
     #endregion Namespaces
 
@@ -109,11 +110,88 @@ namespace Microsoft.OData.Client
                         return query.AsEnumerable().First();
                     case SequenceMethod.FirstOrDefault:
                         return query.AsEnumerable().FirstOrDefault();
-#if !PORTABLELIB
                     case SequenceMethod.LongCount:
                     case SequenceMethod.Count:
-                        return (TElement)Convert.ChangeType(((DataServiceQuery<TElement>)query).GetQuerySetCount(this.Context), typeof(TElement), System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
-#endif
+                        {
+                            Func<string, object> parseResponseFunc = (response) =>
+                            {
+                                return Convert.ChangeType(response, typeof(TElement), System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                            };
+                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, parseResponseFunc);
+                        }
+                    case SequenceMethod.SumIntSelector:
+                    case SequenceMethod.SumDoubleSelector:
+                    case SequenceMethod.SumDecimalSelector:
+                    case SequenceMethod.SumLongSelector:
+                    case SequenceMethod.SumSingleSelector:
+                    case SequenceMethod.SumNullableIntSelector:
+                    case SequenceMethod.SumNullableDoubleSelector:
+                    case SequenceMethod.SumNullableDecimalSelector:
+                    case SequenceMethod.SumNullableLongSelector:
+                    case SequenceMethod.SumNullableSingleSelector:
+                    case SequenceMethod.AverageIntSelector:
+                    case SequenceMethod.AverageDoubleSelector:
+                    case SequenceMethod.AverageDecimalSelector:
+                    case SequenceMethod.AverageLongSelector:
+                    case SequenceMethod.AverageSingleSelector:
+                    case SequenceMethod.AverageNullableIntSelector:
+                    case SequenceMethod.AverageNullableDoubleSelector:
+                    case SequenceMethod.AverageNullableDecimalSelector:
+                    case SequenceMethod.AverageNullableLongSelector:
+                    case SequenceMethod.AverageNullableSingleSelector:
+                    case SequenceMethod.MinSelector:
+                    case SequenceMethod.MinDoubleSelector:
+                    case SequenceMethod.MinDecimalSelector:
+                    case SequenceMethod.MinLongSelector:
+                    case SequenceMethod.MinSingleSelector:
+                    case SequenceMethod.MinNullableIntSelector:
+                    case SequenceMethod.MinNullableDoubleSelector:
+                    case SequenceMethod.MinNullableDecimalSelector:
+                    case SequenceMethod.MinNullableLongSelector:
+                    case SequenceMethod.MinNullableSingleSelector:
+                    case SequenceMethod.MaxSelector:
+                    case SequenceMethod.MaxDoubleSelector:
+                    case SequenceMethod.MaxDecimalSelector:
+                    case SequenceMethod.MaxLongSelector:
+                    case SequenceMethod.MaxSingleSelector:
+                    case SequenceMethod.MaxNullableIntSelector:
+                    case SequenceMethod.MaxNullableDoubleSelector:
+                    case SequenceMethod.MaxNullableDecimalSelector:
+                    case SequenceMethod.MaxNullableLongSelector:
+                    case SequenceMethod.MaxNullableSingleSelector:
+                        {
+                            Func<string, object> parseResponseFunc = (response) =>
+                            {
+                                JObject obj = JObject.Parse(response);
+                                JToken contextToken, valueToken;
+                                if (obj.TryGetValue(XmlConstants.ODataContext, out contextToken) && obj.TryGetValue("value", out valueToken))
+                                {
+                                    string contextValue = contextToken.ToString();
+                                    JArray valueArray = valueToken as JArray;
+
+                                    // To get the alias for the aggregation
+                                    int leftParenPos = contextValue.LastIndexOf(UriHelper.LEFTPAREN);
+                                    int rightParenPos = contextValue.LastIndexOf(UriHelper.RIGHTPAREN);
+
+                                    if (leftParenPos > 0 && rightParenPos > leftParenPos && valueArray != null)
+                                    {
+                                        string alias = contextValue.Substring(leftParenPos + 1, (rightParenPos - leftParenPos - 1));
+                                        object aggregationResult = valueArray.Count > 0 ? valueArray[0].Value<string>(alias) : null;
+
+                                        Type type = Nullable.GetUnderlyingType(typeof(TElement));
+                                        if (type == null) // Not a nullable type
+                                        {
+                                            type = typeof(TElement);
+                                        }
+
+                                        return Convert.ChangeType(aggregationResult, type, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                    }
+                                }
+
+                                return null;
+                            };
+                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, parseResponseFunc);
+                        }
                     default:
                         throw Error.MethodNotSupported(mce);
                 }

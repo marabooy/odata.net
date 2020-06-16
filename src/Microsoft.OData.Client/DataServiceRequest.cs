@@ -15,7 +15,7 @@ namespace Microsoft.OData.Client
     using System.Xml;
     using Microsoft.OData;
 
-    /// <summary>non-generic placeholder for generic implementation</summary>
+    /// <summary>Non-generic placeholder for generic implementation</summary>
     public abstract class DataServiceRequest
     {
         /// <summary>internal constructor so that only our assembly can provide an implementation</summary>
@@ -139,7 +139,6 @@ namespace Microsoft.OData.Client
         /// <returns>instance of query components</returns>
         internal abstract QueryComponents QueryComponents(ClientEdmModel model);
 
-#if !PORTABLELIB// Synchronous methods not available
         /// <summary>
         /// execute uri and materialize result
         /// </summary>
@@ -186,23 +185,23 @@ namespace Microsoft.OData.Client
         }
 
         /// <summary>
-        /// Synchronizely get the query set count from the server by executing the $count=value query
+        /// Synchronously executes the query
         /// </summary>
         /// <param name="context">The context</param>
-        /// <returns>The server side count of the query set</returns>
-        internal long GetQuerySetCount(DataServiceContext context)
+        /// <returns>The query result</returns>
+        internal TElement GetValue<TElement>(DataServiceContext context, Func<string, object> parseResponseFunc)
         {
             Debug.Assert(context != null, "context is null");
-            Version requestVersion = this.QueryComponents(context.Model).Version;
+            QueryComponents queryComponents = this.QueryComponents(context.Model);
+            Version requestVersion = queryComponents.Version;
             if (requestVersion == null)
             {
                 requestVersion = Util.ODataVersion4;
             }
 
             QueryResult response = null;
-            QueryComponents qc = this.QueryComponents(context.Model);
-            Uri requestUri = qc.Uri;
-            DataServiceRequest<long> serviceRequest = new DataServiceRequest<long>(requestUri, qc, null);
+            Uri requestUri = queryComponents.Uri;
+            DataServiceRequest<TElement> serviceRequest = new DataServiceRequest<TElement>(requestUri, queryComponents, null);
 
             HeaderCollection headers = new HeaderCollection();
 
@@ -223,27 +222,30 @@ namespace Microsoft.OData.Client
 
                 if (HttpStatusCode.NoContent != response.StatusCode)
                 {
-                    StreamReader sr = new StreamReader(response.GetResponseStream());
-                    long r = -1;
+                    StreamReader reader = new StreamReader(response.GetResponseStream());
+                    TElement result = default(TElement);
+
                     try
                     {
-                        r = XmlConvert.ToInt64(sr.ReadToEnd());
+                        string content = reader.ReadToEnd();
+                        object parsedResult = parseResponseFunc(content);
+                        result = (TElement)parsedResult;
                     }
                     finally
                     {
-                        sr.Close();
+                        reader.Close();
                     }
 
-                    return r;
+                    return result;
                 }
                 else
                 {
-                    throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetCount, response.Failure);
+                    throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue, response.Failure);
                 }
             }
             catch (InvalidOperationException ex)
             {
-                QueryOperationResponse operationResponse = null;
+                QueryOperationResponse operationResponse;
                 operationResponse = response.GetResponse<long>(MaterializeAtom.EmptyResults);
                 if (operationResponse != null)
                 {
@@ -254,7 +256,6 @@ namespace Microsoft.OData.Client
                 throw;
             }
         }
-#endif
 
         /// <summary>
         /// Begins an asynchronous request to an Internet resource.
@@ -338,14 +339,7 @@ namespace Microsoft.OData.Client
                 return new QueryResult(source, method, this, requestMessage, requestInfo, callback, state, requestMessage.CachedRequestStream);
             }
 
-#if PORTABLELIB
-            // Empty Memorystream will be set when posting null operation parameters
-            return string.CompareOrdinal(XmlConstants.HttpMethodPost, qc.HttpMethod) == 0
-                ? new QueryResult(source, method, this, requestMessage, requestInfo, callback, state, new ContentStream(new MemoryStream(), false /*isKnownMemoryStream*/))
-                : new QueryResult(source, method, this, requestMessage, requestInfo, callback, state);
-#else
             return new QueryResult(source, method, this, requestMessage, requestInfo, callback, state);
-#endif
         }
     }
 }
