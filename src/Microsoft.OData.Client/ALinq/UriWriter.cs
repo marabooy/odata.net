@@ -596,6 +596,7 @@ namespace Microsoft.OData.Client
             tmpBuilder.Append(UriHelper.AGGREGATE);
             tmpBuilder.Append(UriHelper.LEFTPAREN);
             int idx = 0;
+
             while (true)
             {
                 ApplyQueryOptionExpression.Aggregation aggregation = aqoe.Aggregations[idx];
@@ -641,7 +642,7 @@ namespace Microsoft.OData.Client
         /// <param name="optionValue">The value</param>
         private void AddAsCachedQueryOption(string optionKey, string optionValue)
         {
-            List<string> tmp = null;
+            List<string> tmp;
             if (!this.cachedQueryOptions.TryGetValue(optionKey, out tmp))
             {
                 tmp = new List<string>();
