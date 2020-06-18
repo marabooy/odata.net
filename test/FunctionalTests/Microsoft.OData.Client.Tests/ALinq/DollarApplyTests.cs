@@ -6,9 +6,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using Microsoft.OData.Edm;
 using Xunit;
 
@@ -31,10 +34,11 @@ namespace Microsoft.OData.Client.Tests.ALinq
 
     public class DollarApplyTests
     {
-        private readonly DataServiceContext context;
+        private Random rand = new Random();
+        private readonly DataServiceContext dsContext;
         private const string serviceUri = "http://tempuri.org";
         private const string numbersEntitySetName = "Numbers";
-        private static string aggregateUrlTemplate = serviceUri + '/' + numbersEntitySetName + "?$apply=aggregate({0} with {1} as {2})";
+        private static string aggregateUriTemplate = serviceUri + '/' + numbersEntitySetName + "?$apply=aggregate({0} with {1} as {2})";
 
         public static IEnumerable<object[]> GetApplyQueryOptionData()
         {
@@ -50,8 +54,20 @@ namespace Microsoft.OData.Client.Tests.ALinq
                     var nullablePropertyName = "Nullable" + propertyName; // e.g. NullableIntProp
                     var nullableAggregationAlias = aggregationMethod + nullablePropertyName; // e.g. SumNullableIntProp
 
-                    testData.Add(new object[] { aggregationMethod, propertyName, string.Format(aggregateUrlTemplate, propertyName, aggregationMethodToLower, aggregationAlias) });
-                    testData.Add(new object[] { aggregationMethod, nullablePropertyName, string.Format(aggregateUrlTemplate, nullablePropertyName, aggregationMethodToLower, nullableAggregationAlias) });
+                    testData.Add(new object[]
+                    {
+                        aggregationMethod,
+                        aggregationAlias,
+                        propertyName,
+                        string.Format(aggregateUriTemplate, propertyName, aggregationMethodToLower, aggregationAlias)
+                    });
+                    testData.Add(new object[]
+                    { 
+                        aggregationMethod,
+                        nullableAggregationAlias,
+                        nullablePropertyName,
+                        string.Format(aggregateUriTemplate, nullablePropertyName, aggregationMethodToLower, nullableAggregationAlias) 
+                    });
                     // e.g.
                     // { "Sum", "IntProp", "http://tempuri.org/Numbers?$apply=aggregate(IntProp with sum as SumIntProp)" }
                     // { "Sum", "NullableIntProp", "http://tempuri.org/Numbers?$apply=aggregate(NullableIntProp with sum as SumNullableIntProp)" }
@@ -85,15 +101,15 @@ namespace Microsoft.OData.Client.Tests.ALinq
 
             container.AddEntitySet(numbersEntitySetName, entity);
 
-            context = new DataServiceContext(new Uri(serviceUri));
-            context.Format.UseJson(model);
+            dsContext = new DataServiceContext(new Uri(serviceUri));
+            dsContext.Format.UseJson(model);
         }
 
         [Theory]
         [MemberData(nameof(GetApplyQueryOptionData))]
-        public void TranslateLinqAggregateExpressionToExpectedAggregateUri(string aggregationMethod, string propertyName, string expectedAggregateUri)
+        public void TranslateLinqAggregateExpressionToExpectedUriThenExecute(string aggregationMethod, string aggregationAlias, string propertyName, string expectedAggregateUri)
         {
-            DataServiceQuery<Number> queryable = this.context.CreateQuery<Number>(numbersEntitySetName);
+            DataServiceQuery<Number> queryable = this.dsContext.CreateQuery<Number>(numbersEntitySetName);
 
             PropertyInfo propertyInfo = queryable.ElementType.GetProperty(propertyName);
             ParameterExpression parameterExpr = Expression.Parameter(queryable.ElementType, "d");
@@ -133,9 +149,96 @@ namespace Microsoft.OData.Client.Tests.ALinq
                 new[] { queryable.Expression, Expression.Quote(selectorExpr) });
 
             // Call factory method for creating DataServiceOrderedQuery based on Linq expression
-            var query = new DataServiceQueryProvider(context).CreateQuery(methodCallExpr);
+            var query = new DataServiceQueryProvider(dsContext).CreateQuery(methodCallExpr);
 
+            // Verify expected aggregate Uri
             Assert.Equal(expectedAggregateUri, query.ToString());
+
+            Type returnType = propertyType;
+            if ((propertyType.Equals(typeof(int)) || propertyType.Equals(typeof(long))) 
+                && aggregationMethod.Equals("Average", StringComparison.OrdinalIgnoreCase))
+            {
+                returnType = aggregationMethodInfo.ReturnType;
+            }
+
+            // Execute expression and verify result
+            var randomAggregateValue = GenerateRandomAggregateValue(aggregationMethod, returnType);
+            InterceptRequestAndMockResponse(aggregationAlias, randomAggregateValue);
+
+            // Use reflection to get Execute method - should make it easy to apply different return types
+            MethodInfo executeMethodInfo = typeof(DataServiceQueryProvider).GetMethods()
+                .Where(d => d.Name.Equals("Execute")
+                    && d.IsGenericMethodDefinition
+                    && d.GetParameters().Length == 1
+                    && d.GetParameters()[0].ParameterType.Equals(typeof(Expression))
+                    && d.IsPublic
+                    && !d.IsStatic
+                ).FirstOrDefault();
+
+            var dsqpInstance = new DataServiceQueryProvider(dsContext);
+            var result = executeMethodInfo.MakeGenericMethod(returnType).Invoke(dsqpInstance, new object[] { methodCallExpr });
+
+            Assert.Equal(result, randomAggregateValue);
+        }
+
+        // To generate a relevant aggregate value to be returned in the mock response
+        private object GenerateRandomAggregateValue(string aggregationMethod, Type returnType)
+        {
+            int lowerBound = 100;
+            int upperBound = 1000;
+            object aggregationValue;
+
+            switch (aggregationMethod.ToLowerInvariant())
+            {
+                case "average":
+                    // A decimal value should suffice as average for all types
+                    aggregationValue = Math.Round((double)upperBound * rand.NextDouble(), 2);
+                    break;
+                case "min":
+                case "max":
+                case "sum":
+                    if (returnType.Equals(typeof(int)) || returnType.Equals(typeof(long)))
+                        aggregationValue = rand.Next(lowerBound, upperBound);
+                    else
+                        aggregationValue = Math.Round(upperBound * rand.NextDouble(), 2);
+                    break;
+                default:
+                    aggregationValue = rand.Next(lowerBound, upperBound);
+                    break;
+            }
+
+            // Get underlying type if type is nullable - to use in Convert.ChangeType
+            Type underlyingType = Nullable.GetUnderlyingType(returnType);
+            if (underlyingType == null) // Not a nullable type
+            {
+                underlyingType = returnType;
+            }
+
+            return Convert.ChangeType(aggregationValue, underlyingType, CultureInfo.InvariantCulture.NumberFormat);
+        }
+
+        private void InterceptRequestAndMockResponse(string aggregateAlias, object aggregateValue)
+        {
+            dsContext.Configurations.RequestPipeline.OnMessageCreating = (args) =>
+            {
+                var contentTypeHeader = "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8";
+                var odataVersionHeader = "4.0";
+                // e.g. "{\"@odata.context\":\"http://ServiceRoot/$metadata#Numbers(SumIntProp)\",\"value\":[{\"@odata.id\":null,\"SumIntProp\":506}]}"
+                var mockedResponse = string.Format(
+                    "{{\"@odata.context\":\"{0}/$metadata#{1}({2})\",\"value\":[{{\"@odata.id\":null,\"{2}\":{3}}}]}}",
+                    serviceUri,
+                    numbersEntitySetName,
+                    aggregateAlias,
+                    aggregateValue);
+
+                return new TestHttpWebRequestMessage(args,
+                    new Dictionary<string, string>
+                    {
+                        {"Content-Type", contentTypeHeader},
+                        {"OData-Version", odataVersionHeader},
+                    },
+                    () => new MemoryStream(Encoding.UTF8.GetBytes(mockedResponse)));
+            };
         }
     }
 }

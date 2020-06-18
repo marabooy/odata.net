@@ -178,13 +178,13 @@ namespace Microsoft.OData.Client
                                         string alias = contextValue.Substring(leftParenPos + 1, (rightParenPos - leftParenPos - 1));
                                         object aggregationResult = valueArray.Count > 0 ? valueArray[0].Value<string>(alias) : null;
 
-                                        Type type = Nullable.GetUnderlyingType(typeof(TElement));
-                                        if (type == null) // Not a nullable type
+                                        Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
+                                        if (underlyingType == null) // Not a nullable type
                                         {
-                                            type = typeof(TElement);
+                                            underlyingType = typeof(TElement);
                                         }
 
-                                        return Convert.ChangeType(aggregationResult, type, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                        return Convert.ChangeType(aggregationResult, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
                                     }
                                 }
 
