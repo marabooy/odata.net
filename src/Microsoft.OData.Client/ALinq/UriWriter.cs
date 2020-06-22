@@ -601,6 +601,15 @@ namespace Microsoft.OData.Client
             {
                 ApplyQueryOptionExpression.Aggregation aggregation = aqoe.Aggregations[idx];
                 AggregationMethod aggregationMethod = aggregation.AggregationMethod;
+
+                string aggregationUriEquivalent;
+                if (!TypeSystem.TryGetUriEquivalent(aggregationMethod, out aggregationUriEquivalent))
+                {
+                    // This would happen if an aggregation method was added to the enum with no
+                    // relevant update to map it to the URI equivalent 
+                    throw new NotSupportedException(Strings.ALinq_AggregationMethodNotSupported(aggregationMethod.ToString()));
+                }
+
                 string aggregationProperty = this.ExpressionToString(aggregation.Expression, /*inPath*/ false);
                 
                 // E.g. Amount with sum as SumAmount (For $count aggregation: $count as Count)
@@ -612,7 +621,7 @@ namespace Microsoft.OData.Client
                     tmpBuilder.Append(UriHelper.SPACE);
                 }
 
-                tmpBuilder.Append(aggregationMethod.ToUriEquivalent());
+                tmpBuilder.Append(aggregationUriEquivalent);
                 tmpBuilder.Append(UriHelper.SPACE);
                 tmpBuilder.Append(UriHelper.AS);
                 tmpBuilder.Append(UriHelper.SPACE);

@@ -801,8 +801,6 @@ namespace Microsoft.OData.Client
 
         internal static Expression ApplyAggregation(MethodCallExpression mce, OData.UriParser.Aggregation.AggregationMethod aggregationMethod)
         {
-            // TODO: Add more validations?
-
             QueryableResourceExpression input;
             LambdaExpression le;
             if (!TryGetResourceSetMethodArguments(mce, out input, out le))
@@ -833,8 +831,6 @@ namespace Microsoft.OData.Client
             }
 
             aggregations.Add(new ApplyQueryOptionExpression.Aggregation(selector, aggregationMethod));
-
-            // TODO: Create a copy of ResourceExpression?
 
             return input;
         }
@@ -1549,26 +1545,8 @@ namespace Microsoft.OData.Client
                         case SequenceMethod.AverageNullableSingleSelector:
                             return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Average);
                         case SequenceMethod.MinSelector:
-                        case SequenceMethod.MinDoubleSelector:
-                        case SequenceMethod.MinDecimalSelector:
-                        case SequenceMethod.MinLongSelector:
-                        case SequenceMethod.MinSingleSelector:
-                        case SequenceMethod.MinNullableIntSelector:
-                        case SequenceMethod.MinNullableDoubleSelector:
-                        case SequenceMethod.MinNullableDecimalSelector:
-                        case SequenceMethod.MinNullableLongSelector:
-                        case SequenceMethod.MinNullableSingleSelector:
                             return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Min);
                         case SequenceMethod.MaxSelector:
-                        case SequenceMethod.MaxDoubleSelector:
-                        case SequenceMethod.MaxDecimalSelector:
-                        case SequenceMethod.MaxLongSelector:
-                        case SequenceMethod.MaxSingleSelector:
-                        case SequenceMethod.MaxNullableIntSelector:
-                        case SequenceMethod.MaxNullableDoubleSelector:
-                        case SequenceMethod.MaxNullableDecimalSelector:
-                        case SequenceMethod.MaxNullableLongSelector:
-                        case SequenceMethod.MaxNullableSingleSelector:
                             return ApplyAggregation(mce, OData.UriParser.Aggregation.AggregationMethod.Max);
                         default:
                             throw Error.MethodNotSupported(mce);

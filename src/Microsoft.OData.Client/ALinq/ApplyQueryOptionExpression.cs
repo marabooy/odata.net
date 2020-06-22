@@ -75,37 +75,6 @@ namespace Microsoft.OData.Client
 				this.Expression = exp;
 				this.AggregationMethod = aggregationMethod;
 			}
-
-
 		}
 	}
-
-
-	// TODO: Find this extentions class a proper home
-	internal static class QueryOptionExtensions
-    {
-		private static Dictionary<AggregationMethod, string> aggregationMethodMap = 
-			new Dictionary<AggregationMethod, string>(EqualityComparer<AggregationMethod>.Default)
-		{
-			{ AggregationMethod.Sum, "sum" },
-			{ AggregationMethod.Average, "average" },
-			{ AggregationMethod.Min, "min" },
-			{ AggregationMethod.Max, "max" },
-			{ AggregationMethod.CountDistinct, "countdistinct" },
-            { AggregationMethod.VirtualPropertyCount, "$count" }
-		};
-
-
-		internal static string ToUriEquivalent(this AggregationMethod aggregationMethod)
-        {
-			string uriEquivalent;
-
-			if (!aggregationMethodMap.TryGetValue(aggregationMethod, out uriEquivalent))
-            {
-				throw new NotSupportedException(Strings.ALinq_AggregationMethodNotSupported(aggregationMethod.ToString()));
-            }
-
-			return uriEquivalent;
-        }
-    }
 }

@@ -19,11 +19,16 @@ namespace Microsoft.OData.Client.Tests
 	private readonly IDictionary<string, string> headers;
 
 	public TestHttpWebRequestMessage(DataServiceClientRequestMessageArgs args)
-		: this(args, new Dictionary<string, string>(), () => new MemoryStream(Encoding.UTF8.GetBytes("")))
+		: this(args, new Dictionary<string, string>(), 200, () => new MemoryStream(Encoding.UTF8.GetBytes("")))
 	{
 	}
 
-	public TestHttpWebRequestMessage(DataServiceClientRequestMessageArgs args, IDictionary<string, string> headers, Func<Stream> getResponseStream, int statusCode = 200)
+	public TestHttpWebRequestMessage(DataServiceClientRequestMessageArgs args, IDictionary<string, string> headers, Func<Stream> getResponseStream)
+		: this(args, headers, 200, getResponseStream)
+    {
+    }
+
+	public TestHttpWebRequestMessage(DataServiceClientRequestMessageArgs args, IDictionary<string, string> headers, int statusCode, Func<Stream> getResponseStream)
 		: base(args)
 	{
 		this.headers = headers;

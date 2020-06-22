@@ -11,10 +11,13 @@ namespace Microsoft.OData.Client
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-    using Newtonsoft.Json.Linq;
+    using Microsoft.OData.Edm;
+    using Microsoft.OData.Client.Metadata;
+    using System.Xml;
 
     #endregion Namespaces
 
@@ -113,11 +116,23 @@ namespace Microsoft.OData.Client
                     case SequenceMethod.LongCount:
                     case SequenceMethod.Count:
                         {
-                            Func<string, object> parseResponseFunc = (response) =>
+                            Func<QueryResult, TElement> parseQueryResultFunc = (queryResult) =>
                             {
-                                return Convert.ChangeType(response, typeof(TElement), System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                StreamReader reader = new StreamReader(queryResult.GetResponseStream());
+                                long querySetCount = -1;
+
+                                try
+                                {
+                                    querySetCount = XmlConvert.ToInt64(reader.ReadToEnd());
+                                }
+                                finally
+                                {
+                                    reader.Close();
+                                }
+
+                                return (TElement)Convert.ChangeType(querySetCount, typeof(TElement), System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
                             };
-                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, parseResponseFunc);
+                            return ((DataServiceQuery<TElement>)query).GetValue(this.Context, parseQueryResultFunc);
                         }
                     case SequenceMethod.SumIntSelector:
                     case SequenceMethod.SumDoubleSelector:
@@ -139,58 +154,52 @@ namespace Microsoft.OData.Client
                     case SequenceMethod.AverageNullableDecimalSelector:
                     case SequenceMethod.AverageNullableLongSelector:
                     case SequenceMethod.AverageNullableSingleSelector:
-                    case SequenceMethod.MinSelector:
-                    case SequenceMethod.MinDoubleSelector:
-                    case SequenceMethod.MinDecimalSelector:
-                    case SequenceMethod.MinLongSelector:
-                    case SequenceMethod.MinSingleSelector:
-                    case SequenceMethod.MinNullableIntSelector:
-                    case SequenceMethod.MinNullableDoubleSelector:
-                    case SequenceMethod.MinNullableDecimalSelector:
-                    case SequenceMethod.MinNullableLongSelector:
-                    case SequenceMethod.MinNullableSingleSelector:
-                    case SequenceMethod.MaxSelector:
-                    case SequenceMethod.MaxDoubleSelector:
-                    case SequenceMethod.MaxDecimalSelector:
-                    case SequenceMethod.MaxLongSelector:
-                    case SequenceMethod.MaxSingleSelector:
-                    case SequenceMethod.MaxNullableIntSelector:
-                    case SequenceMethod.MaxNullableDoubleSelector:
-                    case SequenceMethod.MaxNullableDecimalSelector:
-                    case SequenceMethod.MaxNullableLongSelector:
-                    case SequenceMethod.MaxNullableSingleSelector:
+                    case SequenceMethod.MinSelector: // Mapped to a generic expression - Min(IQueryable`1<T0>, Expression`1<Func`2<T0, T1>>)->T1
+                    case SequenceMethod.MaxSelector: // Mapped to a generic expression - Max(IQueryable`1<T0>, Expression`1<Func`2<T0, T1>>)->T1
                         {
-                            Func<string, object> parseResponseFunc = (response) =>
+                            Func<QueryResult, TElement> parseQueryResultFunc = (queryResult) =>
                             {
-                                JObject obj = JObject.Parse(response);
-                                JToken contextToken, valueToken;
-                                if (obj.TryGetValue(XmlConstants.ODataContext, out contextToken) && obj.TryGetValue("value", out valueToken))
+                                IDictionary<string, string> responseHeaders = new Dictionary<string, string>();
+                                responseHeaders.Add(ODataConstants.ContentTypeHeader, "application/json");
+                                HttpWebResponseMessage httpWebResponseMessage = new HttpWebResponseMessage(responseHeaders, (int)queryResult.StatusCode, queryResult.GetResponseStream);
+
+                                ODataMessageReaderSettings messageReaderSettings = new ODataMessageReaderSettings
                                 {
-                                    string contextValue = contextToken.ToString();
-                                    JArray valueArray = valueToken as JArray;
+                                    Validations = ~ValidationKinds.ThrowOnUndeclaredPropertyForNonOpenType
+                                };
 
-                                    // To get the alias for the aggregation
-                                    int leftParenPos = contextValue.LastIndexOf(UriHelper.LEFTPAREN);
-                                    int rightParenPos = contextValue.LastIndexOf(UriHelper.RIGHTPAREN);
-
-                                    if (leftParenPos > 0 && rightParenPos > leftParenPos && valueArray != null)
+                                ODataResource entry = default(ODataResource);
+                                using (var messageReader = new ODataMessageReader(httpWebResponseMessage, messageReaderSettings, this.Context.Format.ServiceModel))
+                                {
+                                    var reader = messageReader.CreateODataResourceSetReader();
+                                    while (reader.Read())
                                     {
-                                        string alias = contextValue.Substring(leftParenPos + 1, (rightParenPos - leftParenPos - 1));
-                                        object aggregationResult = valueArray.Count > 0 ? valueArray[0].Value<string>(alias) : null;
-
-                                        Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
-                                        if (underlyingType == null) // Not a nullable type
+                                        switch (reader.State)
                                         {
-                                            underlyingType = typeof(TElement);
-                                        }
+                                            case ODataReaderState.ResourceEnd:
+                                                entry = reader.Item as ODataResource;
+                                                if (entry != null && entry.Properties.Any())
+                                                {
+                                                    ODataProperty aggregationProperty = entry.Properties.First();
+                                                    ODataUntypedValue untypedValue = aggregationProperty.Value as ODataUntypedValue;
 
-                                        return Convert.ChangeType(aggregationResult, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                                    Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
+                                                    if (underlyingType == null) // Not a nullable type
+                                                    {
+                                                        underlyingType = typeof(TElement);
+                                                    }
+
+                                                    return (TElement)Convert.ChangeType(untypedValue.RawValue, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                                }
+                                                break;
+                                        }
                                     }
                                 }
 
-                                return null;
+                                // Failed to retrieve the aggregate result for whatever reason
+                                throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue);
                             };
-                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, parseResponseFunc);
+                            return ((DataServiceQuery<TElement>)query).GetValue(this.Context, parseQueryResultFunc);
                         }
                     default:
                         throw Error.MethodNotSupported(mce);

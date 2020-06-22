@@ -14,6 +14,8 @@ namespace Microsoft.OData.Client
     using System.Net;
     using System.Xml;
     using Microsoft.OData;
+    using Microsoft.OData.Client.Metadata;
+    using Microsoft.OData.Edm;
 
     /// <summary>Non-generic placeholder for generic implementation</summary>
     public abstract class DataServiceRequest
@@ -189,7 +191,7 @@ namespace Microsoft.OData.Client
         /// </summary>
         /// <param name="context">The context</param>
         /// <returns>The query result</returns>
-        internal TElement GetValue<TElement>(DataServiceContext context, Func<string, object> parseResponseFunc)
+        internal TElement GetValue<TElement>(DataServiceContext context, Func<QueryResult, TElement> parseQueryResultFunc)
         {
             Debug.Assert(context != null, "context is null");
             QueryComponents queryComponents = this.QueryComponents(context.Model);
@@ -199,7 +201,6 @@ namespace Microsoft.OData.Client
                 requestVersion = Util.ODataVersion4;
             }
 
-            QueryResult response = null;
             Uri requestUri = queryComponents.Uri;
             DataServiceRequest<TElement> serviceRequest = new DataServiceRequest<TElement>(requestUri, queryComponents, null);
 
@@ -214,39 +215,27 @@ namespace Microsoft.OData.Client
                 context.CreateRequestArgsAndFireBuildingRequest(httpMethod, requestUri, headers, context.HttpStack, null /*descriptor*/),
                 null /*descriptor*/);
 
-            response = new QueryResult(this, Util.ExecuteMethodName, serviceRequest, request, new RequestInfo(context), null, null);
+            QueryResult queryResult = new QueryResult(this, Util.ExecuteMethodName, serviceRequest, request, new RequestInfo(context), null, null);
 
             try
             {
-                response.ExecuteQuery();
-
-                if (HttpStatusCode.NoContent != response.StatusCode)
+                queryResult.ExecuteQuery();
+                
+                if (HttpStatusCode.NoContent != queryResult.StatusCode)
                 {
-                    StreamReader reader = new StreamReader(response.GetResponseStream());
-                    TElement result = default(TElement);
+                    TElement parsedResult = parseQueryResultFunc(queryResult);
 
-                    try
-                    {
-                        string content = reader.ReadToEnd();
-                        object parsedResult = parseResponseFunc(content);
-                        result = (TElement)parsedResult;
-                    }
-                    finally
-                    {
-                        reader.Close();
-                    }
-
-                    return result;
+                    return parsedResult;
                 }
                 else
                 {
-                    throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue, response.Failure);
+                    throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue, queryResult.Failure);
                 }
             }
             catch (InvalidOperationException ex)
             {
                 QueryOperationResponse operationResponse;
-                operationResponse = response.GetResponse<long>(MaterializeAtom.EmptyResults);
+                operationResponse = queryResult.GetResponse<TElement>(MaterializeAtom.EmptyResults);
                 if (operationResponse != null)
                 {
                     operationResponse.Error = ex;
