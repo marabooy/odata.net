@@ -86,6 +86,9 @@ namespace Microsoft.OData.Client
         /// <summary>apply</summary>
         internal const string OPTIONAPPLY = "apply";
 
+        /// <summary>groupby</summary>
+        internal const string GROUPBY = "groupby";
+
         /// <summary>aggregate</summary>
         internal const string AGGREGATE = "aggregate";
 

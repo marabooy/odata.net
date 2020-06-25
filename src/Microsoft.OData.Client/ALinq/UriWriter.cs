@@ -592,14 +592,20 @@ namespace Microsoft.OData.Client
         /// <param name="aqoe">ApplyQueryOptionExpression expression to visit</param>
         internal void VisitQueryOptionExpression(ApplyQueryOptionExpression aqoe)
         {
-            StringBuilder tmpBuilder = new StringBuilder();
-            tmpBuilder.Append(UriHelper.AGGREGATE);
-            tmpBuilder.Append(UriHelper.LEFTPAREN);
-            int idx = 0;
+            // No reason to proceed if there are no aggregations
+            if (aqoe.Aggregations.Count == 0)
+            {
+                return;
+            }
+
+            StringBuilder aggBuilder = new StringBuilder();
+            aggBuilder.Append(UriHelper.AGGREGATE);
+            aggBuilder.Append(UriHelper.LEFTPAREN);
+            int aggIdx = 0;
 
             while (true)
             {
-                ApplyQueryOptionExpression.Aggregation aggregation = aqoe.Aggregations[idx];
+                ApplyQueryOptionExpression.Aggregation aggregation = aqoe.Aggregations[aggIdx];
                 AggregationMethod aggregationMethod = aggregation.AggregationMethod;
 
                 string aggregationUriEquivalent;
@@ -615,33 +621,64 @@ namespace Microsoft.OData.Client
                 // E.g. Amount with sum as SumAmount (For $count aggregation: $count as Count)
                 if (aggregationMethod != AggregationMethod.VirtualPropertyCount)
                 {
-                    tmpBuilder.Append(aggregationProperty);
-                    tmpBuilder.Append(UriHelper.SPACE);
-                    tmpBuilder.Append(UriHelper.WITH);
-                    tmpBuilder.Append(UriHelper.SPACE);
+                    aggBuilder.Append(aggregationProperty);
+                    aggBuilder.Append(UriHelper.SPACE);
+                    aggBuilder.Append(UriHelper.WITH);
+                    aggBuilder.Append(UriHelper.SPACE);
                 }
 
-                tmpBuilder.Append(aggregationUriEquivalent);
-                tmpBuilder.Append(UriHelper.SPACE);
-                tmpBuilder.Append(UriHelper.AS);
-                tmpBuilder.Append(UriHelper.SPACE);
+                aggBuilder.Append(aggregationUriEquivalent);
+                aggBuilder.Append(UriHelper.SPACE);
+                aggBuilder.Append(UriHelper.AS);
+                aggBuilder.Append(UriHelper.SPACE);
                 // MUST define an alias for the resulting aggregate value
                 // Concatenate aggregation method with aggregation property to generate a simple identifier/alias
                 // OASIS Standard: The alias MUST NOT collide with names of declared properties, custom aggregates, or other aliases in that type
                 // TODO: Strategy to avoid name collision - Append a Guid?
                 string aggregateAlias = aggregationMethod.ToString() + aggregationProperty.Replace('/', '_');
-                tmpBuilder.Append(aggregateAlias);
+                aggBuilder.Append(aggregateAlias);
 
-                if (++idx == aqoe.Aggregations.Count)
+                if (++aggIdx == aqoe.Aggregations.Count)
                 {
                     break;
                 }
 
-                tmpBuilder.Append(UriHelper.COMMA);
+                aggBuilder.Append(UriHelper.COMMA);
             }
-            tmpBuilder.Append(UriHelper.RIGHTPAREN);
+            aggBuilder.Append(UriHelper.RIGHTPAREN);
 
-            this.AddAsCachedQueryOption(UriHelper.DOLLARSIGN + UriHelper.OPTIONAPPLY, tmpBuilder.ToString());
+            if (aqoe.GroupingExpressions.Count == 0)
+            {
+                // e.g. $apply=aggregate(Prop with sum as SumProp, Prop with average as AverageProp)
+                this.AddAsCachedQueryOption(UriHelper.DOLLARSIGN + UriHelper.OPTIONAPPLY, aggBuilder.ToString());
+            }
+            else
+            {
+                StringBuilder grpBuilder = new StringBuilder();
+                grpBuilder.Append(UriHelper.GROUPBY);
+                grpBuilder.Append(UriHelper.LEFTPAREN);
+                grpBuilder.Append(UriHelper.LEFTPAREN);
+                int grpIdx = 0;
+
+                while (true)
+                {
+                    Expression groupingExpression = aqoe.GroupingExpressions[grpIdx];
+                    grpBuilder.Append(this.ExpressionToString(groupingExpression, /*inPath*/ false));
+
+                    if (++grpIdx == aqoe.GroupingExpressions.Count)
+                    {
+                        break;
+                    }
+                    grpBuilder.Append(UriHelper.COMMA);
+                }
+                grpBuilder.Append(UriHelper.RIGHTPAREN);
+                grpBuilder.Append(UriHelper.COMMA);
+                grpBuilder.Append(aggBuilder.ToString());
+                grpBuilder.Append(UriHelper.RIGHTPAREN);
+
+                // e.g. $apply=groupby((Category),aggregate(Prop with sum as SumProp, Prop with average as AverageProp))
+                this.AddAsCachedQueryOption(UriHelper.DOLLARSIGN + UriHelper.OPTIONAPPLY, grpBuilder.ToString());
+            }
         }
 
         /// <summary>
