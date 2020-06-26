@@ -97,6 +97,42 @@ namespace Microsoft.OData.Client
             MethodCallExpression mce = expression as MethodCallExpression;
             Debug.Assert(mce != null, "mce != null");
 
+            Func<string, object> aggregationParseFunction = (response) =>
+            {
+                JObject obj = JObject.Parse(response);
+                JToken contextToken, valueToken;
+                if (obj.TryGetValue(XmlConstants.ODataContext, out contextToken) && obj.TryGetValue("value", out valueToken))
+                {
+                    string contextValue = contextToken.ToString();
+                    JArray valueArray = valueToken as JArray;
+
+                    // To get the alias for the aggregation
+                    int leftParenPos = contextValue.LastIndexOf(UriHelper.LEFTPAREN);
+                    int rightParenPos = contextValue.LastIndexOf(UriHelper.RIGHTPAREN);
+
+                    if (leftParenPos > 0 && rightParenPos > leftParenPos && valueArray != null)
+                    {
+                        string alias = contextValue.Substring(leftParenPos + 1, (rightParenPos - leftParenPos - 1));
+                        object aggregationResult = valueArray.Count > 0 ? valueArray[0].Value<string>(alias) : null;
+
+                        Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
+                        if (underlyingType == null) // Not a nullable type
+                        {
+                            underlyingType = typeof(TElement);
+                        }
+
+                        return Convert.ChangeType(aggregationResult, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                    }
+                }
+
+                return null;
+            };
+
+            if (TryAnalyzeCountDistinct(mce))
+            {
+                return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, aggregationParseFunction);
+            }
+
             SequenceMethod sequenceMethod;
             if (ReflectionUtil.TryIdentifySequenceMethod(mce.Method, out sequenceMethod))
             {
@@ -160,37 +196,7 @@ namespace Microsoft.OData.Client
                     case SequenceMethod.MaxNullableLongSelector:
                     case SequenceMethod.MaxNullableSingleSelector:
                         {
-                            Func<string, object> parseResponseFunc = (response) =>
-                            {
-                                JObject obj = JObject.Parse(response);
-                                JToken contextToken, valueToken;
-                                if (obj.TryGetValue(XmlConstants.ODataContext, out contextToken) && obj.TryGetValue("value", out valueToken))
-                                {
-                                    string contextValue = contextToken.ToString();
-                                    JArray valueArray = valueToken as JArray;
-
-                                    // To get the alias for the aggregation
-                                    int leftParenPos = contextValue.LastIndexOf(UriHelper.LEFTPAREN);
-                                    int rightParenPos = contextValue.LastIndexOf(UriHelper.RIGHTPAREN);
-
-                                    if (leftParenPos > 0 && rightParenPos > leftParenPos && valueArray != null)
-                                    {
-                                        string alias = contextValue.Substring(leftParenPos + 1, (rightParenPos - leftParenPos - 1));
-                                        object aggregationResult = valueArray.Count > 0 ? valueArray[0].Value<string>(alias) : null;
-
-                                        Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
-                                        if (underlyingType == null) // Not a nullable type
-                                        {
-                                            underlyingType = typeof(TElement);
-                                        }
-
-                                        return Convert.ChangeType(aggregationResult, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
-                                    }
-                                }
-
-                                return null;
-                            };
-                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, parseResponseFunc);
+                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, aggregationParseFunction);
                         }
                     default:
                         throw Error.MethodNotSupported(mce);
@@ -200,6 +206,36 @@ namespace Microsoft.OData.Client
             // Should never get here - should be caught by expression compiler.
             Debug.Assert(false, "Not supported singleton operator not caught by Resource Binder");
             throw Error.MethodNotSupported(mce);
+        }
+
+        private bool TryAnalyzeCountDistinct(MethodCallExpression mce)
+        {
+
+            // Since this is in the return path of the countdistinct we need to check for correct method sequence only and not validate anything else
+            // todo refactor the validation
+            var nextSequence = mce.Arguments.Any() ? mce.Arguments[0] as MethodCallExpression : null;
+            // Validate the next call sequence is .Distinct().Count() else return false;
+            // Next we validate we are seeing a token for Distinct
+            if (nextSequence == null) return false;
+
+
+            SequenceMethod nextMethodToken;
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Distinct)
+            {
+                return false;
+            }
+
+            nextSequence = nextSequence.Arguments.Any() ? nextSequence.Arguments[0] as MethodCallExpression : null;
+            if (nextSequence == null) return false;
+
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Select)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>Builds the Uri for the expression passed in.</summary>
@@ -219,6 +255,7 @@ namespace Microsoft.OData.Client
             {
                 normalizerRewrites = new Dictionary<Expression, Expression>(ReferenceEqualityComparer<Expression>.Instance);
                 e = Evaluator.PartialEval(e);
+                //todo update and remove pattern where method name 
                 e = ExpressionNormalizer.Normalize(e, normalizerRewrites);
                 e = ResourceBinder.Bind(e, this.Context);
                 addTrailingParens = true;
