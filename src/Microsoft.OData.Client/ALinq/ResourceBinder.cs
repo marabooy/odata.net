@@ -1444,6 +1444,7 @@ namespace Microsoft.OData.Client
 
         private static Expression AnalyzeCountMethod(MethodCallExpression mce)
         {
+
             // [Res].LongCount()
             // [Res].Count()
             // It is either a ResourceExpression or a collection property.
@@ -1553,6 +1554,13 @@ namespace Microsoft.OData.Client
             SequenceMethod sequenceMethod;
             if (ReflectionUtil.TryIdentifySequenceMethod(mce.Method, out sequenceMethod))
             {
+                // We need to handle Select.Distinct.Count sequence first as it is unique
+
+                if (sequenceMethod == SequenceMethod.Count && this.TryAnalyzeCountDistinct(mce, out e))
+                {
+                    return e;
+                }
+
                 // The leaf projection can be one of Select(source, selector) or
                 // SelectMany(source, collectionSelector, resultSelector).
                 if (sequenceMethod == SequenceMethod.Select ||
@@ -1709,6 +1717,64 @@ namespace Microsoft.OData.Client
             return e;
         }
 
+        private  bool TryAnalyzeCountDistinct(MethodCallExpression methodCallExpression, out Expression expression)
+        {
+            // todo refactor the validation
+            var nextSequence = methodCallExpression.Arguments.Any() ? methodCallExpression.Arguments[0] as MethodCallExpression : null;
+            expression = null;
+            // Validate the next call sequence is .Distinct().Count() else return false;
+            // Next we validate we are seeing a token for Distinct
+            if (nextSequence == null) return false;
+
+
+            SequenceMethod nextMethodToken;
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Distinct)
+            {
+                return false;
+            }
+
+            nextSequence = nextSequence.Arguments.Any() ? nextSequence.Arguments[0] as MethodCallExpression : null;
+            if (nextSequence == null) return false;
+
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Select)
+            {
+                return false;
+            }
+
+            ResourceExpression source = this.Visit(nextSequence.Arguments[0]) as ResourceExpression;
+            if (source == null)
+            {
+                return false;
+            }
+            // We are now sure this is a count distinct call
+            // We extract the select lambda to extract the parameter
+            LambdaExpression lambda;
+            if (!PatternRules.MatchSingleArgumentLambda(nextSequence.Arguments[1], out lambda))
+            {
+                return false;
+            }
+
+            // the projection might be over a transparent identifier, so first try to rewrite if that is the case
+            lambda = ProjectionRewriter.TryToRewrite(lambda, source);
+
+            ResourceExpression re = source.CreateCloneWithNewType(methodCallExpression.Type);
+
+            // See whether the lambda matches a projection that is satisfied with $select usage.
+            if (!ProjectionAnalyzer.Analyze(lambda, re, true, this.context))
+            {
+                return false;
+            }
+
+            // Defer validating until after the projection has been analyzed since the lambda could represent a
+            // navigation that we do not want to turn into a projection.
+            ValidationRules.RequireCanProject(source);
+            expression = AnalyzeAggregation(nextSequence,AggregationMethod.CountDistinct);
+
+            return true;
+        }
+        
         /// <summary>Strips calls to .Cast() methods, returning the underlying expression.</summary>
         /// <param name="expression">Expression to strip calls from.</param>
         /// <returns>The underlying expression.</returns>

@@ -100,6 +100,54 @@ namespace Microsoft.OData.Client
             MethodCallExpression mce = expression as MethodCallExpression;
             Debug.Assert(mce != null, "mce != null");
 
+            Func<QueryResult, TElement> aggregationParseFunction = (queryResult) =>
+            {
+                IDictionary<string, string> responseHeaders = new Dictionary<string, string>();
+                responseHeaders.Add(ODataConstants.ContentTypeHeader, "application/json");
+                HttpWebResponseMessage httpWebResponseMessage = new HttpWebResponseMessage(responseHeaders, (int)queryResult.StatusCode, queryResult.GetResponseStream);
+
+                ODataMessageReaderSettings messageReaderSettings = new ODataMessageReaderSettings
+                {
+                    Validations = ~ValidationKinds.ThrowOnUndeclaredPropertyForNonOpenType
+                };
+
+                ODataResource entry = default(ODataResource);
+                using (var messageReader = new ODataMessageReader(httpWebResponseMessage, messageReaderSettings, this.Context.Format.ServiceModel))
+                {
+                    var reader = messageReader.CreateODataResourceSetReader();
+                    while (reader.Read())
+                    {
+                        switch (reader.State)
+                        {
+                            case ODataReaderState.ResourceEnd:
+                                entry = reader.Item as ODataResource;
+                                if (entry != null && entry.Properties.Any())
+                                {
+                                    ODataProperty aggregationProperty = entry.Properties.First();
+                                    ODataUntypedValue untypedValue = aggregationProperty.Value as ODataUntypedValue;
+
+                                    Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
+                                    if (underlyingType == null) // Not a nullable type
+                                    {
+                                        underlyingType = typeof(TElement);
+                                    }
+
+                                    return (TElement)Convert.ChangeType(untypedValue.RawValue, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
+                                }
+                                break;
+                        }
+                    }
+                }
+
+                // Failed to retrieve the aggregate result for whatever reason
+                throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue);
+            };
+
+            if (TryAnalyzeCountDistinct(mce))
+            {
+                return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, aggregationParseFunction);
+            }
+
             SequenceMethod sequenceMethod;
             if (ReflectionUtil.TryIdentifySequenceMethod(mce.Method, out sequenceMethod))
             {
@@ -157,49 +205,8 @@ namespace Microsoft.OData.Client
                     case SequenceMethod.MinSelector: // Mapped to a generic expression - Min(IQueryable`1<T0>, Expression`1<Func`2<T0, T1>>)->T1
                     case SequenceMethod.MaxSelector: // Mapped to a generic expression - Max(IQueryable`1<T0>, Expression`1<Func`2<T0, T1>>)->T1
                         {
-                            Func<QueryResult, TElement> parseQueryResultFunc = (queryResult) =>
-                            {
-                                IDictionary<string, string> responseHeaders = new Dictionary<string, string>();
-                                responseHeaders.Add(ODataConstants.ContentTypeHeader, "application/json");
-                                HttpWebResponseMessage httpWebResponseMessage = new HttpWebResponseMessage(responseHeaders, (int)queryResult.StatusCode, queryResult.GetResponseStream);
 
-                                ODataMessageReaderSettings messageReaderSettings = new ODataMessageReaderSettings
-                                {
-                                    Validations = ~ValidationKinds.ThrowOnUndeclaredPropertyForNonOpenType
-                                };
-
-                                ODataResource entry = default(ODataResource);
-                                using (var messageReader = new ODataMessageReader(httpWebResponseMessage, messageReaderSettings, this.Context.Format.ServiceModel))
-                                {
-                                    var reader = messageReader.CreateODataResourceSetReader();
-                                    while (reader.Read())
-                                    {
-                                        switch (reader.State)
-                                        {
-                                            case ODataReaderState.ResourceEnd:
-                                                entry = reader.Item as ODataResource;
-                                                if (entry != null && entry.Properties.Any())
-                                                {
-                                                    ODataProperty aggregationProperty = entry.Properties.First();
-                                                    ODataUntypedValue untypedValue = aggregationProperty.Value as ODataUntypedValue;
-
-                                                    Type underlyingType = Nullable.GetUnderlyingType(typeof(TElement));
-                                                    if (underlyingType == null) // Not a nullable type
-                                                    {
-                                                        underlyingType = typeof(TElement);
-                                                    }
-
-                                                    return (TElement)Convert.ChangeType(untypedValue.RawValue, underlyingType, System.Globalization.CultureInfo.InvariantCulture.NumberFormat);
-                                                }
-                                                break;
-                                        }
-                                    }
-                                }
-
-                                // Failed to retrieve the aggregate result for whatever reason
-                                throw new DataServiceQueryException(Strings.DataServiceRequest_FailGetValue);
-                            };
-                            return ((DataServiceQuery<TElement>)query).GetValue(this.Context, parseQueryResultFunc);
+                            return ((DataServiceQuery<TElement>)query).GetValue<TElement>(this.Context, aggregationParseFunction);
                         }
                     default:
                         throw Error.MethodNotSupported(mce);
@@ -209,6 +216,36 @@ namespace Microsoft.OData.Client
             // Should never get here - should be caught by expression compiler.
             Debug.Assert(false, "Not supported singleton operator not caught by Resource Binder");
             throw Error.MethodNotSupported(mce);
+        }
+
+        private bool TryAnalyzeCountDistinct(MethodCallExpression mce)
+        {
+
+            // Since this is in the return path of the countdistinct we need to check for correct method sequence only and not validate anything else
+            // todo refactor the validation
+            var nextSequence = mce.Arguments.Any() ? mce.Arguments[0] as MethodCallExpression : null;
+            // Validate the next call sequence is .Distinct().Count() else return false;
+            // Next we validate we are seeing a token for Distinct
+            if (nextSequence == null) return false;
+
+
+            SequenceMethod nextMethodToken;
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Distinct)
+            {
+                return false;
+            }
+
+            nextSequence = nextSequence.Arguments.Any() ? nextSequence.Arguments[0] as MethodCallExpression : null;
+            if (nextSequence == null) return false;
+
+            ReflectionUtil.TryIdentifySequenceMethod(nextSequence.Method, out nextMethodToken);
+            if (nextMethodToken != SequenceMethod.Select)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>Builds the Uri for the expression passed in.</summary>
@@ -228,6 +265,7 @@ namespace Microsoft.OData.Client
             {
                 normalizerRewrites = new Dictionary<Expression, Expression>(ReferenceEqualityComparer<Expression>.Instance);
                 e = Evaluator.PartialEval(e);
+                //todo update and remove pattern where method name 
                 e = ExpressionNormalizer.Normalize(e, normalizerRewrites);
                 e = ResourceBinder.Bind(e, this.Context);
                 addTrailingParens = true;
