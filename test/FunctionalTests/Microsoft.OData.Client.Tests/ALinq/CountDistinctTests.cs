@@ -91,7 +91,7 @@ namespace Microsoft.OData.Client.Tests.ALinq
             var queryable = context.CreateQuery<Document>("Documents");
             InterceptRequestAndMockResponse(context, "CountDistinctName", aggregateValue);
             Action act = ()=> queryable.Distinct().Count();
-            act.ShouldThrow<NotSupportedException>("The method 'Distinct' is not supported.");
+            act.Should().Throw<NotSupportedException>("The method 'Distinct' is not supported.");
         }
 
     }
