@@ -23,7 +23,7 @@ namespace Microsoft.OData.Client.Tests.ALinq
             AddNewEndingTokenVisitor visitor = new AddNewEndingTokenVisitor(new NonSystemToken("stuff", null, null));
             SystemToken token = new SystemToken(ExpressionConstants.It, null);
             Action visitSystemToken = () => token.Accept(visitor);
-            visitSystemToken.ShouldThrow<NotSupportedException>().WithMessage(Strings.ALinq_IllegalSystemQueryOption(ExpressionConstants.It));
+            visitSystemToken.Should().Throw<NotSupportedException>().WithMessage(Strings.ALinq_IllegalSystemQueryOption(ExpressionConstants.It));
         }
 
         [Fact]

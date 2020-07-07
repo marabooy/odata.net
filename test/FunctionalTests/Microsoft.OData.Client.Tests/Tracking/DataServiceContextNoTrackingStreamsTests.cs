@@ -289,7 +289,7 @@ namespace Microsoft.OData.Client.Tests.Tracking
             var customers = await NonTrackingContext.Customers2.ExecuteAsync();
 
             Action action = () => NonTrackingContext.GetReadStreamUri(customers.First(), "ProfilePhoto");
-            action.ShouldThrow<InvalidOperationException>();
+            action.Should().Throw<InvalidOperationException>();
         }
 
         private async Task SaveContextChangesAsync(DataServiceContext[] dataServiceContexts)

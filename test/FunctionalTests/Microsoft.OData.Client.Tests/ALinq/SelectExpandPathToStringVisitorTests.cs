@@ -23,7 +23,7 @@ namespace Microsoft.OData.Client.Tests.ALinq
             SelectExpandPathToStringVisitor visitor = new SelectExpandPathToStringVisitor();
             SystemToken systemToken = new SystemToken(ExpressionConstants.It, null);
             Action visitSystemToken = () => systemToken.Accept(visitor);
-            visitSystemToken.ShouldThrow<NotSupportedException>().WithMessage(Strings.ALinq_IllegalSystemQueryOption(ExpressionConstants.It));
+            visitSystemToken.Should().Throw<NotSupportedException>().WithMessage(Strings.ALinq_IllegalSystemQueryOption(ExpressionConstants.It));
         }
 
         [Fact]

@@ -1756,6 +1756,11 @@ namespace Microsoft.OData.Client
                 return false;
             }
 
+            if (!(lambda.Body is MemberExpression member && member.Expression is ParameterExpression))
+            {
+                return false;
+            }
+
             // the projection might be over a transparent identifier, so first try to rewrite if that is the case
             lambda = ProjectionRewriter.TryToRewrite(lambda, source);
 
