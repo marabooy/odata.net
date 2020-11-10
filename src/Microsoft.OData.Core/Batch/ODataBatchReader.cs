@@ -146,7 +146,7 @@ namespace Microsoft.OData
             return this.ReadAsynchronously().FollowOnFaultWith(t => this.State = ODataBatchReaderState.Exception);
         }
 
-        /// <summary>Returns an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for reading the content of a batch operation.</summary>
+        /// <summary>Returns an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for reading the content of a batch operation.</summary>
         /// <returns>A request message for reading the content of a batch operation.</returns>
         public ODataBatchOperationRequestMessage CreateOperationRequestMessage()
         {
@@ -158,7 +158,7 @@ namespace Microsoft.OData
             return result;
         }
 
-        /// <summary>Asynchronously returns an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for reading the content of a batch operation.</summary>
+        /// <summary>Asynchronously returns an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for reading the content of a batch operation.</summary>
         /// <returns>A task that when completed returns a request message for reading the content of a batch operation.</returns>
         public Task<ODataBatchOperationRequestMessage> CreateOperationRequestMessageAsync()
         {
@@ -175,7 +175,7 @@ namespace Microsoft.OData
                 .FollowOnFaultWith(t => this.State = ODataBatchReaderState.Exception);
         }
 
-        /// <summary>Returns an <see cref="T:Microsoft.OData.ODataBatchOperationResponseMessage" /> for reading the content of a batch operation.</summary>
+        /// <summary>Returns an <see cref="Microsoft.OData.ODataBatchOperationResponseMessage" /> for reading the content of a batch operation.</summary>
         /// <returns>A response message for reading the content of a batch operation.</returns>
         public ODataBatchOperationResponseMessage CreateOperationResponseMessage()
         {
@@ -186,7 +186,7 @@ namespace Microsoft.OData
             return result;
         }
 
-        /// <summary>Asynchronously returns an <see cref="T:Microsoft.OData.ODataBatchOperationResponseMessage" /> for reading the content of a batch operation.</summary>
+        /// <summary>Asynchronously returns an <see cref="Microsoft.OData.ODataBatchOperationResponseMessage" /> for reading the content of a batch operation.</summary>
         /// <returns>A task that when completed returns a response message for reading the content of a batch operation.</returns>
         public Task<ODataBatchOperationResponseMessage> CreateOperationResponseMessageAsync()
         {
@@ -291,6 +291,13 @@ namespace Microsoft.OData
         protected abstract ODataBatchReaderState ReadAtChangesetEndImplementation();
 
         /// <summary>
+        /// Validate the dependsOnIds.
+        /// </summary>
+        /// <param name="contentId">The request Id</param>
+        /// <param name="dependsOnIds">The dependsOn ids specifying current request's prerequisites.</param>
+        protected abstract void ValidateDependsOnIds(string contentId, IEnumerable<string> dependsOnIds);
+
+        /// <summary>
         /// Instantiate an <see cref="ODataBatchOperationRequestMessage"/> instance.
         /// </summary>
         /// <param name="streamCreatorFunc">The function for stream creation.</param>
@@ -318,13 +325,7 @@ namespace Microsoft.OData
         {
             if (dependsOnRequestIds != null && dependsOnIdsValidationRequired)
             {
-                foreach (string id in dependsOnRequestIds)
-                {
-                    if (!this.PayloadUriConverter.ContainsContentId(id))
-                    {
-                        throw new ODataException(Strings.ODataBatchReader_DependsOnIdNotFound(id, contentId));
-                    }
-                }
+                ValidateDependsOnIds(contentId, dependsOnRequestIds);
             }
 
             Uri uri = ODataBatchUtils.CreateOperationRequestUri(

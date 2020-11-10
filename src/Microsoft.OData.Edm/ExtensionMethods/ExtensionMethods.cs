@@ -987,7 +987,7 @@ namespace Microsoft.OData.Edm
                 {
                     operationImports = model.EntityContainer.FindOperationImportsExtended(simpleOperationName);
 
-                    if (operationImports != null && operationImports.Count() > 0)
+                    if (operationImports != null && operationImports.Any())
                     {
                         return true;
                     }
@@ -1593,23 +1593,27 @@ namespace Microsoft.OData.Edm
         {
             EdmUtil.CheckArgumentNull(type, "type");
 
-            var primitiveType = type as EdmCoreModelPrimitiveType;
-            if (primitiveType != null)
+            if (type.TypeKind == EdmTypeKind.Primitive)
             {
-                return primitiveType.FullName;
+                EdmCoreModelPrimitiveType primitiveType = type as EdmCoreModelPrimitiveType;
+                if (primitiveType != null)
+                {
+                    return primitiveType.FullName;
+                }
             }
 
-            var namedDefinition = type as IEdmSchemaElement;
-            var collectionType = type as IEdmCollectionType;
-            if (collectionType == null)
+            IEdmSchemaElement namedDefinition;
+            if (type.TypeKind != EdmTypeKind.Collection)
             {
+                namedDefinition = type as IEdmSchemaElement;
                 return namedDefinition != null ? namedDefinition.FullName() : null;
             }
-
-            // Handle collection case.
-            namedDefinition = collectionType.ElementType.Definition as IEdmSchemaElement;
-
-            return namedDefinition != null ? string.Format(CultureInfo.InvariantCulture, CollectionTypeFormat, namedDefinition.FullName()) : null;
+            else
+            {
+                // Handle collection case.
+                namedDefinition = (type as IEdmCollectionType).ElementType.Definition as IEdmSchemaElement;
+                return namedDefinition != null ? string.Format(CultureInfo.InvariantCulture, CollectionTypeFormat, namedDefinition.FullName()) : null;
+            }
         }
 
         /// <summary>
@@ -1618,9 +1622,13 @@ namespace Microsoft.OData.Edm
         /// <param name="type">Reference to the calling object.</param>
         /// <returns>The element type of this references definition.</returns>
         public static IEdmType AsElementType(this IEdmType type)
-        {
-            IEdmCollectionType collectionType = type as IEdmCollectionType;
-            return (collectionType != null) ? collectionType.ElementType.Definition : type;
+        {   
+            if(type == null)
+            {
+                return type;
+            }
+
+            return (type.TypeKind == EdmTypeKind.Collection) ? (type as IEdmCollectionType).ElementType.Definition : type;
         }
 
         #endregion
@@ -2674,7 +2682,7 @@ namespace Microsoft.OData.Edm
             var csdlSemanticsNavigationProperty = navigationProperty as CsdlSemanticsNavigationProperty;
             if (csdlSemanticsNavigationProperty != null)
             {
-                return ((CsdlNavigationProperty)csdlSemanticsNavigationProperty.Element).PartnerPath;
+                return (csdlSemanticsNavigationProperty.Element as CsdlNavigationProperty)?.PartnerPath;
             }
 
             // Default behavior where partner path corresponds to the name of the partner nav. property. In other words,

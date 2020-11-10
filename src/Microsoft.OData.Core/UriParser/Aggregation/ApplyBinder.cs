@@ -182,6 +182,8 @@ namespace Microsoft.OData.UriParser.Aggregation
                             return EdmCoreModel.Instance.GetPrimitive(EdmPrimitiveTypeKind.Double, expressionType.IsNullable);
                         case EdmPrimitiveTypeKind.Decimal:
                             return EdmCoreModel.Instance.GetPrimitive(EdmPrimitiveTypeKind.Decimal, expressionType.IsNullable);
+                        case EdmPrimitiveTypeKind.Single:
+                            return EdmCoreModel.Instance.GetPrimitive(EdmPrimitiveTypeKind.Single, expressionType.IsNullable);
                         case EdmPrimitiveTypeKind.None:
                             return expressionType;
                         default:
@@ -211,7 +213,7 @@ namespace Microsoft.OData.UriParser.Aggregation
             if (aggregateExpressionsCache != null)
             {
                 AggregateExpression expression = aggregateExpressionsCache.OfType<AggregateExpression>()
-                    .FirstOrDefault(statement => statement.AggregateKind == AggregateExpressionKind.PropertyAggregate && statement.Alias.Equals(name));
+                    .FirstOrDefault(statement => statement.AggregateKind == AggregateExpressionKind.PropertyAggregate && statement.Alias.Equals(name, StringComparison.Ordinal));
                 if (expression != null)
                 {
                     return expression.TypeReference;

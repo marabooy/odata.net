@@ -60,7 +60,7 @@ namespace Microsoft.OData.Edm.Csdl
                 return false;
             }
 
-            if (schemas.Count() == 0)
+            if (!schemas.Any())
             {
                 errors = new EdmError[] { new EdmError(new CsdlLocation(0, 0), EdmErrorCode.NoSchemasProduced, Edm.Strings.Serializer_NoSchemasProduced) };
                 return false;
@@ -81,7 +81,8 @@ namespace Microsoft.OData.Edm.Csdl
                 XmlWriter writer = writerProvider(schema.Namespace);
                 if (writer != null)
                 {
-                    visitor = new EdmModelCsdlSerializationVisitor(model, writer, edmVersion);
+                    var schemaWriter = new EdmModelCsdlSchemaXmlWriter(model, writer, edmVersion);
+                    visitor = new EdmModelCsdlSerializationVisitor(model, schemaWriter);
                     visitor.VisitEdmSchema(schema, model.GetNamespacePrefixMappings());
                 }
             }

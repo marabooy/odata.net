@@ -942,7 +942,7 @@ Content-Type: application/json;odata.metadata=none
                     () => ClientWriteRequestForMultipartBatchVerifyDependsOnIds(
                         contentIdRef, odataVersion));
 
-                Assert.True(ode.Message.Contains(referenceIdNotIncludedInDependsOn));
+                Assert.Contains(referenceIdNotIncludedInDependsOn, ode.Message);
             }
         }
 
@@ -956,7 +956,7 @@ Content-Type: application/json;odata.metadata=none
             ODataException ode = Assert.Throws<ODataException>(
                     () => ClientWriteRequestForMultipartBatchVerifyDependsOnIdsForTopLevelRequest(
                         topLevelContentId, ODataVersion.V4));
-            Assert.True(ode.Message.Contains(referenceIdNotIncludedInDependsOn));
+            Assert.Contains(referenceIdNotIncludedInDependsOn, ode.Message);
         }
 
         [Fact]
@@ -1018,12 +1018,17 @@ Content-Type: application/json;odata.metadata=none
             }
             catch (Exception e)
             {
-                Assert.True(e.Message.Contains(dependsOnIdNotFound));
+                Assert.Contains(dependsOnIdNotFound, e.Message);
             }
             Assert.True(expectedExceptionThrown, "Uri self-referencing with its Content-ID should not be allowed.");
         }
 
-        [Fact]
+        // This test isn't relevant in Json Batch v4.
+        // We use atomicGroup Id in dependsOn for 2 reasons:
+        // 1. To extract Request ids for use in reference Uris (in v4.01).
+        // 2. To sequence requests so that they are executed in a certain order (in both v4 and v4.01).
+        // This test made an assumption that we only use atomicityGroup for 1 above.
+        /*[Fact]
         public void BatchJsonLightReferenceUriV4TestShouldThrow()
         {
             bool exceptionThrown = true;
@@ -1040,6 +1045,16 @@ Content-Type: application/json;odata.metadata=none
 
             Assert.True(exceptionThrown, "An exception should have been thrown when trying to refer to the " +
                 "content Id of the last request of a change set or atomic group in V4.");
+        }*/
+
+        [Fact]
+        public void BatchJsonLightDependsOnAtomicityGroupV4Test()
+        {
+            byte[] requestPayload = this.CreateReferenceUriBatchRequest(ODataVersion.V4);
+            VerifyPayload(requestPayload, ExpectedReferenceUriRequestPayload);
+
+            byte[] responsePayload = this.ServiceReadReferenceUriBatchRequestAndWriteResponse(requestPayload);
+            VerifyPayload(responsePayload, ExpectedReferenceUriResponsePayload);
         }
 
         [Fact]
@@ -1489,7 +1504,7 @@ Content-Type: application/json;odata.metadata=none
                                 // Verify that the content id of the response is matching that of the request.
                                 if (500 == operationMessage.StatusCode)
                                 {
-                                    Assert.True(operationMessage.ContentId.Equals("3"));
+                                    Assert.Equal("3", operationMessage.ContentId);
                                 }
                             }
                             break;
@@ -1641,9 +1656,9 @@ Content-Type: application/json;odata.metadata=none
                 {
                     dependsOnIds = new string[] { "nonExistant" };
                 }
-                else if(useRequestIdOfGroupForDependsOnIds)
+                else if (useRequestIdOfGroupForDependsOnIds)
                 {
-                    dependsOnIds = new string[] {"1", "2"};
+                    dependsOnIds = new string[] { "1", "2" };
                 }
                 else
                 {

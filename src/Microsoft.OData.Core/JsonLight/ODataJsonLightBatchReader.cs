@@ -54,6 +54,11 @@ namespace Microsoft.OData.JsonLight
         private ODataJsonLightBatchPayloadItemPropertiesCache messagePropertiesCache = null;
 
         /// <summary>
+        /// Collection for keeping track of unique atomic group ids and member request ids.
+        /// </summary>
+        private HashSet<string> requestIds = new HashSet<string>();
+
+        /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="inputContext">The input context to read the content from.</param>
@@ -123,6 +128,16 @@ namespace Microsoft.OData.JsonLight
             // atomicityGroup
             string atomicityGroupId = (string)this.messagePropertiesCache.GetPropertyValue(
                 ODataJsonLightBatchPayloadItemPropertiesCache.PropertyNameAtomicityGroup);
+
+            if (id != null)
+            {
+                this.requestIds.Add(id);
+            }
+
+            if (atomicityGroupId != null)
+            {
+                this.requestIds.Add(atomicityGroupId);
+            }
 
             // dependsOn
             // Flatten the dependsOn list by converting every groupId into request Ids, so that the caller
@@ -333,6 +348,26 @@ namespace Microsoft.OData.JsonLight
         }
 
         /// <summary>
+        /// Validate the dependsOnIds.
+        /// </summary>
+        /// <param name="contentId">The context Id.</param>
+        /// <param name="dependsOnIds">The dependsOn ids specifying current request's prerequisites.</param>
+        protected override void ValidateDependsOnIds(string contentId, IEnumerable<string> dependsOnIds)
+        {
+            foreach (var id in dependsOnIds)
+            {
+                // Content-ID cannot be part of dependsOnIds. This is to avoid self referencing.
+                // The dependsOnId must be an existing request ID or atomicityGroup
+                if (id == contentId ||
+                    (!this.requestIds.Contains(id) &&
+                    !this.requestIds.Contains(id)))
+                {
+                    throw new ODataException(Strings.ODataBatchReader_DependsOnIdNotFound(id, contentId));
+                }
+            }
+        }
+
+        /// <summary>
         /// Validate that the property value is not null.
         /// </summary>
         /// <param name="propertyValue"> Value of the property.</param>
@@ -358,7 +393,7 @@ namespace Microsoft.OData.JsonLight
                 Debug.Assert(dependsOnId != null, "dependsOnId != null");
 
                 // Self reference to atomicityGroup is not allowed.
-                if (dependsOnId.Equals(atomicityGroupId))
+                if (dependsOnId.Equals(atomicityGroupId, StringComparison.Ordinal))
                 {
                     throw new ODataException(Strings.ODataBatchReader_SameRequestIdAsAtomicityGroupIdNotAllowed(
                         dependsOnId,
@@ -366,7 +401,7 @@ namespace Microsoft.OData.JsonLight
                 }
 
                 // Self reference is not allowed.
-                if (dependsOnId.Equals(requestId))
+                if (dependsOnId.Equals(requestId, StringComparison.Ordinal))
                 {
                     throw new ODataException(Strings.ODataBatchReader_SelfReferenceDependsOnRequestIdNotAllowed(
                         dependsOnId,
@@ -376,7 +411,7 @@ namespace Microsoft.OData.JsonLight
                 // For request Id referred to by dependsOn attribute, check that it is not part of any atomic group
                 // other than the dependent request's atomic group (if dependent request belongs to an atomic group).
                 string groupId = this.atomicGroups.GetGroupId(dependsOnId);
-                if (groupId != null && !groupId.Equals(this.atomicGroups.GetGroupId(requestId)))
+                if (groupId != null && !groupId.Equals(this.atomicGroups.GetGroupId(requestId), StringComparison.Ordinal))
                 {
                     throw new ODataException(Strings.ODataBatchReader_DependsOnRequestIdIsPartOfAtomicityGroupNotAllowed(
                         dependsOnId,

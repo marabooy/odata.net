@@ -11,13 +11,14 @@ namespace Microsoft.Test.OData.Tests.Client.ODataWCFServiceTests
     using System.Linq;
     using Microsoft.Test.OData.Services.TestServices.ODataSimplifiedServiceReference;
     using Microsoft.Test.OData.Services.TestServices;
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using Xunit;
 
     /// <summary>
     /// Tests for ODataSimplified service
     /// </summary>
     // [Ignore] // Issues: #623
     // [TestClass] // github issuse: #896
+    //The whole of this class was ignored in MsTest tests that is why am skipping all the tests in this class. 
     public class ODataSimplifiedServiceQueryTests : ODataWCFServiceTestsBase<ODataSimplifiedService>
     {
         public ODataSimplifiedServiceQueryTests()
@@ -25,36 +26,36 @@ namespace Microsoft.Test.OData.Tests.Client.ODataWCFServiceTests
         {
         }
 
-        [TestMethod]
+        [Fact(Skip ="Ignore")]
         public void TestODataSimplifiedServiceQueryEntities()
         {
             TestClientContext.EnableWritingODataAnnotationWithoutPrefix = true;
             TestClientContext.SendingRequest2 += (sender, eventArgs) => ((Microsoft.OData.Client.HttpWebRequestMessage)eventArgs.RequestMessage).SetHeader("Accept", "application/json;odata.metadata=full");
 
-            Assert.IsTrue(TestClientContext.People.ToList().Count >= 5);
-            Assert.AreEqual(5, TestClientContext.Products.ToList().Count);
+            Assert.True(TestClientContext.People.ToList().Count >= 5);
+            Assert.Equal(5, TestClientContext.Products.ToList().Count);
         }
 
-        [TestMethod]
+        [Fact(Skip ="Ignore")]
         public void TestODataSimplifiedServiceQueryNavigationProperty()
         {
             TestClientContext.EnableWritingODataAnnotationWithoutPrefix = true;
             TestClientContext.SendingRequest2 += (sender, eventArgs) => ((Microsoft.OData.Client.HttpWebRequestMessage)eventArgs.RequestMessage).SetHeader("Accept", "application/json;odata.metadata=full");
 
-            Assert.AreEqual(2, TestClientContext.People.ByKey(new Dictionary<string, object> { { "PersonId", 1 } }).Products.ToList().Count);
+            Assert.Equal(2, TestClientContext.People.ByKey(new Dictionary<string, object> { { "PersonId", 1 } }).Products.ToList().Count);
         }
 
-        [TestMethod]
+        [Fact(Skip ="Ignore")]
         public void TestODataSimplifiedServiceQueryExpandedEntities()
         {
             TestClientContext.EnableWritingODataAnnotationWithoutPrefix = true;
             TestClientContext.SendingRequest2 += (sender, eventArgs) => ((Microsoft.OData.Client.HttpWebRequestMessage)eventArgs.RequestMessage).SetHeader("Accept", "application/json;odata.metadata=full");
 
             var person = TestClientContext.People.Expand("Products").Where(p => p.PersonId == 1).ToList();
-            Assert.AreEqual(2, person[0].Products.ToList().Count);
+            Assert.Equal(2, person[0].Products.ToList().Count);
         }
 
-        [TestMethod]
+        [Fact(Skip ="Ignore")]
         public void TestODataSimplifiedServiceCreateEntity()
         {
             TestClientContext.EnableWritingODataAnnotationWithoutPrefix = true;
@@ -77,7 +78,7 @@ namespace Microsoft.Test.OData.Tests.Client.ODataWCFServiceTests
 
             TestClientContext.Detach(person);
             var personReturned = TestClientContext.People.ByKey(new Dictionary<string, object> { { "PersonId", person.PersonId } }).GetValue();
-            Assert.AreEqual(person.PersonId, personReturned.PersonId);
+            Assert.Equal(person.PersonId, personReturned.PersonId);
         }
     }
 }

@@ -434,6 +434,20 @@ namespace Microsoft.OData.Tests
             Action target = () => MediaTypeUtils.AlterContentTypeForJsonPadding(original);
             target.Throws<ODataException>(Strings.ODataMessageWriter_JsonPaddingOnInvalidContentType("tricky/application/json"));
         }
+
+        [Fact]
+        public void MultipartBoundariesShouldNotGrowCache()
+        {
+            for (int i = 1; i < 100; i++)
+            {
+                ODataMediaType mediaType;
+                Encoding encoding;
+                ODataPayloadKind payloadKind;
+                MediaTypeUtils.GetFormatFromContentType(string.Format("multipart/mixed;boundary={0}", Guid.NewGuid()), new ODataPayloadKind[] { ODataPayloadKind.Batch }, ODataMediaTypeResolver.GetMediaTypeResolver(null), out mediaType, out encoding, out payloadKind);
+            }
+
+            Assert.True(MediaTypeUtils.GetCacheKeys().Count(k => k.StartsWith("multipart/mixed")) == 1, "Multiple multipart/mixed keys in cache");
+        }
     }
 
     internal class TestMediaTypeWithFormat
@@ -544,7 +558,7 @@ namespace Microsoft.OData.Tests
 
         public static TestMediaTypeWithFormat HaveParameterValue(this TestMediaTypeWithFormat mediaType, string[] parameterNames, string parameterValue)
         {
-            Assert.True(parameterNames.Any(p => mediaType.MediaType.MediaTypeHasParameterWithValue(p, parameterValue)));
+            Assert.Contains(parameterNames, p => mediaType.MediaType.MediaTypeHasParameterWithValue(p, parameterValue));
             return mediaType;
         }
 

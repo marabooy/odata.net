@@ -24,9 +24,6 @@ namespace Microsoft.OData
         /// <summary>The output context to write to.</summary>
         private readonly ODataOutputContext outputContext;
 
-        /// <summary>The batch-specific URL converter that stores the content IDs found in a changeset and supports resolving cross-referencing URLs.</summary>
-        private readonly ODataBatchPayloadUriConverter payloadUriConverter;
-
         /// <summary>The dependency injection container to get related services.</summary>
         private readonly IServiceProvider container;
 
@@ -60,6 +57,9 @@ namespace Microsoft.OData
         /// Whether the writer is currently processing inside a changeset or atomic group.
         /// </summary>
         private bool isInChangset;
+
+        /// <summary>The batch-specific URL converter that stores the content IDs found in a changeset and supports resolving cross-referencing URLs.</summary>
+        internal readonly ODataBatchPayloadUriConverter payloadUriConverter;
 
         /// <summary>
         /// Constructor.
@@ -257,7 +257,7 @@ namespace Microsoft.OData
                 .FollowOnSuccessWith(t => this.FinishWriteEndChangeset());
         }
 
-        /// <summary>Creates an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.</summary>
+        /// <summary>Creates an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.</summary>
         /// <param name="method">The Http method to be used for this request operation.</param>
         /// <param name="uri">The Uri to be used for this request operation.</param>
         /// <param name="contentId">The Content-ID value to write in ChangeSet header, would be ignored if <paramref name="method"/> is "GET".</param>
@@ -267,7 +267,7 @@ namespace Microsoft.OData
             return CreateOperationRequestMessage(method, uri, contentId, BatchPayloadUriOption.AbsoluteUri);
         }
 
-        /// <summary>Creates an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.</summary>
+        /// <summary>Creates an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.</summary>
         /// <param name="method">The Http method to be used for this request operation.</param>
         /// <param name="uri">The Uri to be used for this request operation.</param>
         /// <param name="contentId">The Content-ID value to write in ChangeSet header, would be ignored if <paramref name="method"/> is "GET".</param>
@@ -281,7 +281,7 @@ namespace Microsoft.OData
         }
 
         /// <summary>
-        /// Creates an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.
+        /// Creates an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing an operation of a batch request.
         /// </summary>
         /// <param name="method">The Http method to be used for this request operation.</param>
         /// <param name="uri">The Uri to be used for this request operation.</param>
@@ -354,7 +354,7 @@ namespace Microsoft.OData
             return this.CreateOperationResponseMessageImplementation(contentId);
         }
 
-        /// <summary>Asynchronously creates an <see cref="T:Microsoft.OData.ODataBatchOperationResponseMessage" /> for writing an operation of a batch response.</summary>
+        /// <summary>Asynchronously creates an <see cref="Microsoft.OData.ODataBatchOperationResponseMessage" /> for writing an operation of a batch response.</summary>
         /// <param name="contentId">The Content-ID value to write in ChangeSet head.</param>
         /// <returns>A task that when completed returns the newly created operation response message.</returns>
         public Task<ODataBatchOperationResponseMessage> CreateOperationResponseMessageAsync(string contentId)
@@ -499,6 +499,13 @@ namespace Microsoft.OData
         protected abstract IEnumerable<string> GetDependsOnRequestIds(IEnumerable<string> dependsOnIds);
 
         /// <summary>
+        /// Validate the dependsOnIds.
+        /// </summary>
+        /// <param name="contentId">The request Id</param>
+        /// <param name="dependsOnIds">The dependsOn ids specifying current request's prerequisites.</param>
+        protected abstract void ValidateDependsOnIds(string contentId, IEnumerable<string> dependsOnIds);
+
+        /// <summary>
         /// Wrapper method to create an operation request message that can be used to write the operation content to, utilizing
         /// private members <see cref="ODataBatchPayloadUriConverter"/> and <see cref="IServiceProvider"/>.
         /// </summary>
@@ -517,14 +524,7 @@ namespace Microsoft.OData
 
             if (dependsOnIds != null)
             {
-                // Validate explicit dependsOnIds cases.
-                foreach (string id in convertedDependsOnIds)
-                {
-                    if (!this.payloadUriConverter.ContainsContentId(id))
-                    {
-                        throw new ODataException(Strings.ODataBatchReader_DependsOnIdNotFound(id, contentId));
-                    }
-                }
+                ValidateDependsOnIds(contentId, convertedDependsOnIds);
             }
 
             // If dependsOnIds is not specified, use the <code>payloadUrlConverter</code>; otherwise use the dependOnIds converted
@@ -592,7 +592,7 @@ namespace Microsoft.OData
         }
 
         /// <summary>
-        /// Internal method to create an <see cref="T:Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing
+        /// Internal method to create an <see cref="Microsoft.OData.ODataBatchOperationRequestMessage" /> for writing
         /// an operation of a batch request.
         /// </summary>
         /// <param name="method">The Http method to be used for this request operation.</param>

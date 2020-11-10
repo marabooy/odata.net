@@ -81,6 +81,8 @@ Context_CannotChangeStateIfAdded=An entity in the 'Added' state cannot be change
 Context_OnMessageCreatingReturningNull=DataServiceContext.Configurations.RequestPipeline.OnMessageCreating property must not return a null value. Please return a non-null value for this property.
 Context_SendingRequest_InvalidWhenUsingOnMessageCreating=SendingRequest cannot be used in combination with the DataServiceContext.Configurations.RequestPipeline.OnMessageCreating property. Please use SendingRequest2 with DataServiceContext.Configurations.RequestPipeline.OnMessageCreating property instead.
 Context_MustBeUsedWith='{0}' must be used with '{1}'.
+Context_EntityMediaLinksNotTrackedInEntity=The context is currently in no tracking mode, in order to use streams make sure your entities extend BaseEntityType and query the Item again from the server to populate the read link or enable tracking.
+Context_EntityInNonTrackedContextLacksMediaLinks=The context is in non tracking mode, The entity does not seem to have the media links populated properly. Please verify server response is correct and that the entity extends BaseEntityType. 
 
 DataServiceClientFormat_LoadServiceModelRequired=When you call the UseJson method without a parameter, you must use the LoadServiceModel property to provide a valid IEdmModel instance.
 DataServiceClientFormat_ValidServiceModelRequiredForJson=To use the JSON format, you must first call DataServiceContext.Format.UseJson() and supply a valid service model.
@@ -206,7 +208,9 @@ ALinq_AnyAllNotSupportedInOrderBy=The method '{0}' is not supported by the 'orde
 ALinq_FormatQueryOptionNotSupported=The '$format' query option is not supported. Use the DataServiceContext.Format property to set the desired format.
 ALinq_IllegalSystemQueryOption=Found the following illegal system token while building a projection or expansion path: '{0}'
 ALinq_IllegalPathStructure=Found a projection as a non-leaf segment in an expand path. Please rephrase your query. The projected property was : '{0}'
-ALinq_TypeTokenWithNoTrailingNavProp=Found an illegal type token '{0}' without a trailing navigation property. 
+ALinq_TypeTokenWithNoTrailingNavProp=Found an illegal type token '{0}' without a trailing navigation property.
+ALinq_AggregationMethodNotSupported=The aggregation method '{0}' is not supported.
+ALinq_InvalidGroupingExpression=The expression '{0}' is not a valid expression for grouping. The grouping expression must evaluate to a single-valued property path, i.e., a path ending in a single-valued primitive.
 
 DSKAttribute_MustSpecifyAtleastOnePropertyName=DataServiceKey attribute must specify at least one property name.
 

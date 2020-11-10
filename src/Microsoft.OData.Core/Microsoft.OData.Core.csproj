@@ -9,7 +9,7 @@
     <DefineConstants>$(DefineConstants);ODATA_CORE;SUPPRESS_PORTABLELIB_TARGETFRAMEWORK_ATTRIBUTE;DelaySignKeys</DefineConstants>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
-  
+ 
   <Import Project="..\Build.props" />
   
   <ItemGroup>
@@ -43,6 +43,13 @@
     <Compile Include="..\PlatformHelper.cs" Link="PlatformHelper.cs" />
     <Compile Include="..\Microsoft.OData.Edm\Csdl\EdmValueWriter.cs" Link="EdmValueWriter.cs" />
     <Compile Include="..\Microsoft.OData.Edm\Csdl\EdmValueParser.cs" Link="EdmValueParser.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.FxCopAnalyzers" Version="3.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

@@ -60,6 +60,27 @@ namespace Microsoft.OData.Tests.UriParser.Extensions.Binders
         }
 
         [Fact]
+        public void BindApplyWithAverageInAggregateShouldReturnApplyClause()
+        {
+            IEnumerable<QueryToken> tokens = _parser.ParseApply("aggregate(UnitPrice with average as AveragePrice)");
+
+            ApplyBinder binder = new ApplyBinder(FakeBindMethods.BindMethodReturningASingleFloatPrimitive, _bindingState);
+            ApplyClause actual = binder.BindApply(tokens);
+
+            Assert.NotNull(actual);
+            AggregateTransformationNode aggregate = Assert.IsType<AggregateTransformationNode>(Assert.Single(actual.Transformations));
+
+            Assert.Equal(TransformationNodeKind.Aggregate, aggregate.Kind);
+            Assert.NotNull(aggregate.AggregateExpressions);
+
+            AggregateExpression statement = Assert.IsType<AggregateExpression>(Assert.Single(aggregate.AggregateExpressions));
+            Assert.NotNull(statement.Expression);
+            Assert.Same(FakeBindMethods.FakeSingleFloatPrimitive, statement.Expression);
+            Assert.Equal(AggregationMethod.Average, statement.Method);
+            Assert.Equal("AveragePrice", statement.Alias);
+        }
+
+        [Fact]
         public void BindApplyWithCountInAggregateShouldReturnApplyClause()
         {
             IEnumerable<QueryToken> tokens = _parser.ParseApply("aggregate($count as TotalCount)");
@@ -71,8 +92,9 @@ namespace Microsoft.OData.Tests.UriParser.Extensions.Binders
             AggregateTransformationNode aggregate = Assert.IsType<AggregateTransformationNode>(Assert.Single(actual.Transformations));
 
             Assert.Equal(TransformationNodeKind.Aggregate, aggregate.Kind);
-            Assert.NotNull(aggregate.Expressions);
-            AggregateExpression statement = Assert.Single(aggregate.Expressions);
+            Assert.NotNull(aggregate.AggregateExpressions);
+            AggregateExpressionBase statementBase = Assert.Single(aggregate.AggregateExpressions);
+            AggregateExpression statement = Assert.IsType<AggregateExpression>(statementBase);
 
             Assert.Equal(AggregationMethod.VirtualPropertyCount, statement.Method);
             Assert.Equal("TotalCount", statement.Alias);
@@ -155,7 +177,7 @@ namespace Microsoft.OData.Tests.UriParser.Extensions.Binders
             GroupByPropertyNode colorNode = Assert.Single(dogNode.ChildTransformations);
             Assert.Equal("Color", colorNode.Name);
             Assert.Same(FakeBindMethods.FakePersonDogColorNode, colorNode.Expression);
-            Assert.Equal(colorNode.ChildTransformations.Count(), 0);
+            Assert.Empty(colorNode.ChildTransformations);
         }
 
         [Fact]
@@ -742,7 +764,7 @@ namespace Microsoft.OData.Tests.UriParser.Extensions.Binders
             return _booleanPrimitiveNode;
         }
 
-        public static void VerifyIsFakeSingleValueNode(QueryNode node)
+        private static void VerifyIsFakeSingleValueNode(QueryNode node)
         {
             Assert.NotNull(node);
             Assert.Same(FakeBindMethods.FakeSingleComplexProperty, node);

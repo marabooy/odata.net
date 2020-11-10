@@ -78,15 +78,13 @@ namespace Microsoft.OData.Tests.ScenarioTests.UriParser
         [InlineData("ID eq 123")]
         [InlineData("ID eq 123F")]
         [InlineData("ID add 123 eq 123F")]
-        [InlineData("ID add 123 eq 123F")]
         public void ParseFilterFloatValuesWithOptionalSuffix(string text)
         {
-            var filterQueryNode = ParseFilter("ID eq 123", HardCodedTestModel.TestModel, HardCodedTestModel.GetPet2Type(), HardCodedTestModel.GetPet2Set());
+            var filterQueryNode = ParseFilter(text, HardCodedTestModel.TestModel, HardCodedTestModel.GetPet2Type(), HardCodedTestModel.GetPet2Set());
             filterQueryNode.Expression.ShouldBeBinaryOperatorNode(BinaryOperatorKind.Equal);
         }
 
         [Theory]
-        [InlineData("ID eq 123L")]
         [InlineData("ID eq 123L")]
         public void ParseFilterFloatValuesNeedPromotion(string text)
         {
@@ -2177,6 +2175,17 @@ namespace Microsoft.OData.Tests.ScenarioTests.UriParser
             var inNode = Assert.IsType<InNode>(filter.Expression);
             Assert.Equal("ID", Assert.IsType<SingleValuePropertyAccessNode>(inNode.Left).Property.Name);
             Assert.Equal("[1,2,3]", Assert.IsType<CollectionConstantNode>(inNode.Right).LiteralText);
+        }
+
+        [Theory]
+        [InlineData("ID in ()")]
+        [InlineData("ID in (  )")]
+        [InlineData("SSN in (  )")]     // Edm.String
+        [InlineData("MyGuid in (  )")]  // Edm.Guid
+        public void FilterWithInOperationWithEmptyCollection(string filterClause)
+        {
+            Action parse = () => ParseFilter(filterClause, HardCodedTestModel.TestModel, HardCodedTestModel.GetPersonType());
+            parse.Throws<ODataException>(ODataErrorStrings.MetadataBinder_RightOperandNotCollectionValue);
         }
 
         [Fact]

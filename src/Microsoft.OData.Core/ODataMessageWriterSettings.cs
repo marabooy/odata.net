@@ -69,7 +69,7 @@ namespace Microsoft.OData
         /// </summary>
         private ValidationKinds validations;
 
-        /// <summary>Initializes a new instance of the <see cref="T:Microsoft.OData.ODataMessageWriterSettings" /> class with default settings. </summary>
+        /// <summary>Initializes a new instance of the <see cref="Microsoft.OData.ODataMessageWriterSettings" /> class with default settings. </summary>
         public ODataMessageWriterSettings()
         {
             this.EnableMessageStreamDisposal = true;
@@ -77,15 +77,16 @@ namespace Microsoft.OData
             this.Validations = ValidationKinds.All;
             this.Validator = new WriterValidator(this);
             this.LibraryCompatibility = ODataLibraryCompatibility.Latest;
+            this.MultipartNewLine = "\r\n";
         }
 
         /// <summary>
-        /// Gets or sets library compatibility version. Default value is <see cref="T:ODataLibraryCompatibilityLevel.Latest"/>,
+        /// Gets or sets library compatibility version. Default value is <see cref="Microsoft.OData.ODataLibraryCompatibility.Latest"/>,
         /// </summary>
         public ODataLibraryCompatibility LibraryCompatibility { get; set; }
 
         /// <summary>
-        /// Gets or sets validations to perform. Default value is <see cref="T:Microsoft.OData.Validations.FullValidation"/>,
+        /// Gets or sets validations to perform. Default value is <see cref="Microsoft.OData.ValidationKinds.All"/>,
         /// </summary>
         public ValidationKinds Validations
         {
@@ -180,6 +181,13 @@ namespace Microsoft.OData
         /// Informs the metadata builder which properties, functions, actions, links to omit.
         /// </summary>
         public ODataMetadataSelector MetadataSelector { get; set; }
+
+        /// <summary>
+        /// Gets or sets the new line character sequence used when writing multipart messages
+        /// see https://tools.ietf.org/html/rfc2046#section-5.1.1
+        /// A TextWriter uses OS specific newline but rfc2046 requires it to be CRLF.
+        /// </summary>
+        public string MultipartNewLine { get; set; }
 
         /// <summary>
         /// Gets the validator corresponding to the validation settings.
